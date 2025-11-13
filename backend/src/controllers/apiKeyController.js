@@ -18,13 +18,7 @@ export const getUserApiKeys = async (req, res) => {
       limit: parseInt(limit),
       offset,
       order: [['createdAt', 'DESC']],
-      include: [
-        {
-          model: Broker,
-          as: 'broker',
-          attributes: ['id', 'name', 'segment', 'logoUrl']
-        }
-      ],
+      // Note: broker field is a string, not a foreign key relation
       attributes: { exclude: ['apiKey', 'apiSecret'] } // Don't send actual keys
     });
 

@@ -16,6 +16,11 @@ import tradeRoutes from './routes/tradeRoutes.js';
 import strategyRoutes from './routes/strategyRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import adminDashboardRoutes from './routes/adminDashboardRoutes.js';
+import adminUserRoutes from './routes/adminUserRoutes.js';
+import adminStrategyRoutes from './routes/adminStrategyRoutes.js';
+import adminTradeRoutes from './routes/adminTradeRoutes.js';
+import adminApiKeyRoutes from './routes/adminApiKeyRoutes.js';
+import adminSupportRoutes from './routes/adminSupportRoutes.js';
 import userDashboardRoutes from './routes/userDashboardRoutes.js';
 import apiKeyRoutes from './routes/apiKeyRoutes.js';
 import planRoutes from './routes/planRoutes.js';
@@ -81,6 +86,11 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/strategies', adminStrategyRoutes);
+app.use('/api/admin/trades', adminTradeRoutes);
+app.use('/api/admin/api-keys', adminApiKeyRoutes);
+app.use('/api/admin/support', adminSupportRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/strategies', strategyRoutes);
 app.use('/api/api-keys', apiKeyRoutes);

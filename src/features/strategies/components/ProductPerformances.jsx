@@ -61,17 +61,23 @@ export default function StrategyView() {
   const showSnack = (message) => setSnack({ open: true, message });
 
   const handleView = async (id) => {
+    // show local data immediately if available, then refresh from API
+    const local = strategies.find((s) => s.id === id || s._id === id);
+    if (local) {
+      setSelectedStrategy(local);
+      setDetailsOpen(true);
+    }
     try {
       const res = await strategyService.getStrategyById(id);
       if (res.success) {
         setSelectedStrategy(res.data);
         setDetailsOpen(true);
-      } else {
+      } else if (!local) {
         showSnack('Failed to load strategy');
       }
     } catch (err) {
       console.error(err);
-      showSnack('Error loading strategy');
+      if (!local) showSnack('Error loading strategy');
     }
   };
 
@@ -128,8 +134,9 @@ export default function StrategyView() {
     }
   };
 
+  // Use the user create route so router resolves the CreateStrategy page correctly
   const handleCreate = () => {
-    navigate('/strategies/create');
+    navigate('/user/create');
   };
 
   return (

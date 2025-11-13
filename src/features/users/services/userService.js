@@ -39,3 +39,17 @@ export const uploadAvatar = async (avatarFile) => {
     throw error;
   }
 };
+
+// Change password
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const response = await apiClient.put('/users/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error changing password:', error);
+    throw error;
+  }
+};

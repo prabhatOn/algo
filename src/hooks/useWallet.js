@@ -7,7 +7,7 @@ import { walletService } from '../services/walletService';
  */
 
 export const useWallet = () => {
-  const [balance, setBalance] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,7 +20,8 @@ export const useWallet = () => {
     try {
       const result = await walletService.getBalance();
       if (result.success) {
-        setBalance(parseFloat(result.data.balance) || 0);
+        // Backend returns full wallet object
+        setWallet(result.data);
       } else {
         setError(result.error);
       }
@@ -93,7 +94,9 @@ export const useWallet = () => {
   }, [fetchBalance, fetchTransactions]);
 
   return {
-    balance,
+    wallet,
+    balance: wallet?.balance || 0,
+    currency: wallet?.currency || 'INR',
     transactions,
     loading,
     error,

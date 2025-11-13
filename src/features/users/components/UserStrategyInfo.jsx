@@ -32,38 +32,67 @@ import LockIcon from '@mui/icons-material/Lock';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
 import { useStrategies } from '../../../hooks/useStrategies';
 import { useToast } from '../../../hooks/useToast';
 import Loader from '../../../components/common/Loader';
+import ViewUserStrategyDialog from '../../strategies/components/ViewUserStrategyDialog';
+import EditUserStrategyDialog from '../../strategies/components/EditUserStrategyDialog';
+import CloneStrategyDialog from '../../strategies/components/CloneStrategyDialog';
+import DeleteUserStrategyConfirm from '../../strategies/components/DeleteUserStrategyConfirm';
+import ToggleStatusConfirmDialog from '../../strategies/components/ToggleStatusConfirmDialog';
 
 const UserStrategyInfo = () => {
   const theme = useTheme();
-  const { strategies, loading, error, updateStrategy, deleteStrategy, refresh } = useStrategies();
-  const { showSuccess, showError } = useToast();
+  const { strategies, loading, error, updateStrategy, deleteStrategy, createStrategy, refresh } = useStrategies();
+  const { showToast } = useToast();
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [viewStrategy, setViewStrategy] = useState(null);
+  const [editStrategy, setEditStrategy] = useState(null);
+  const [cloneStrategy, setCloneStrategy] = useState(null);
+  const [deleteStrategyConfirm, setDeleteStrategyConfirm] = useState(null);
+  const [toggleStatusStrategy, setToggleStatusStrategy] = useState(null);
 
   const handleToggleActive = async (strategyId, currentStatus) => {
     try {
       await updateStrategy(strategyId, { isActive: !currentStatus });
-      showSuccess('Strategy status updated');
+      showToast('Strategy status updated successfully', 'success');
       refresh();
     } catch (err) {
-      showError(err.message || 'Failed to update strategy');
+      showToast(err.message || 'Failed to update strategy', 'error');
+    }
+  };
+
+  const handleEdit = async (strategyId, data) => {
+    try {
+      await updateStrategy(strategyId, data);
+      showToast('Strategy updated successfully', 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message || 'Failed to update strategy', 'error');
+    }
+  };
+
+  const handleClone = async (clonedData) => {
+    try {
+      await createStrategy(clonedData);
+      showToast('Strategy cloned successfully', 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message || 'Failed to clone strategy', 'error');
     }
   };
 
   const handleDelete = async (strategyId) => {
-    if (window.confirm('Are you sure you want to delete this strategy?')) {
-      try {
-        await deleteStrategy(strategyId);
-        showSuccess('Strategy deleted successfully');
-        refresh();
-      } catch (err) {
-        showError(err.message || 'Failed to delete strategy');
-      }
+    try {
+      await deleteStrategy(strategyId);
+      showToast('Strategy deleted successfully', 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message || 'Failed to delete strategy', 'error');
     }
   };
 
@@ -238,16 +267,25 @@ const UserStrategyInfo = () => {
                           <IconButton
                             color="primary"
                             size="small"
-                            onClick={() => alert(`Viewing: ${strategy.name}`)}
+                            onClick={() => setViewStrategy(strategy)}
                           >
                             <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Clone Strategy" arrow>
+                          <IconButton
+                            color="secondary"
+                            size="small"
+                            onClick={() => setCloneStrategy(strategy)}
+                          >
+                            <ContentCopyIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Edit Strategy" arrow>
                           <IconButton
                             color="info"
                             size="small"
-                            onClick={() => alert(`Editing: ${strategy.name}`)}
+                            onClick={() => setEditStrategy(strategy)}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
@@ -256,7 +294,7 @@ const UserStrategyInfo = () => {
                           <IconButton
                             color="error"
                             size="small"
-                            onClick={() => handleDelete(strategy.id)}
+                            onClick={() => setDeleteStrategyConfirm(strategy)}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -312,6 +350,47 @@ const UserStrategyInfo = () => {
           />
         </Box>
       </Paper>
+
+      {/* Dialogs */}
+      <ViewUserStrategyDialog
+        open={Boolean(viewStrategy)}
+        strategy={viewStrategy}
+        onClose={() => setViewStrategy(null)}
+        onEdit={setEditStrategy}
+        onClone={setCloneStrategy}
+        onToggleStatus={() => {
+          setToggleStatusStrategy(viewStrategy);
+          setViewStrategy(null);
+        }}
+      />
+
+      <EditUserStrategyDialog
+        open={Boolean(editStrategy)}
+        strategy={editStrategy}
+        onClose={() => setEditStrategy(null)}
+        onSave={handleEdit}
+      />
+
+      <CloneStrategyDialog
+        open={Boolean(cloneStrategy)}
+        strategy={cloneStrategy}
+        onClose={() => setCloneStrategy(null)}
+        onClone={handleClone}
+      />
+
+      <DeleteUserStrategyConfirm
+        open={Boolean(deleteStrategyConfirm)}
+        strategy={deleteStrategyConfirm}
+        onClose={() => setDeleteStrategyConfirm(null)}
+        onConfirm={handleDelete}
+      />
+
+      <ToggleStatusConfirmDialog
+        open={Boolean(toggleStatusStrategy)}
+        strategy={toggleStatusStrategy}
+        onClose={() => setToggleStatusStrategy(null)}
+        onConfirm={handleToggleActive}
+      />
     </Box>
   );
 };

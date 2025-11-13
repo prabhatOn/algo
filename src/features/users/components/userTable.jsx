@@ -1,219 +1,107 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTheme } from '@mui/material/styles';
 import {
   Box, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, IconButton, Tooltip, Typography,
   TextField, MenuItem, Pagination, Select, Switch, Checkbox, Divider, Drawer, useMediaQuery, Avatar, Button,
-  InputAdornment
+  InputAdornment, CircularProgress, Alert, Chip
 } from '@mui/material';
 import Scrollbar from '../../../components/custom-scroll/Scrollbar';
 import PageContainer from '../../../components/common/PageContainer';
-import { IconEye } from '@tabler/icons-react';
+import { IconEye, IconEdit } from '@tabler/icons-react';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import LockResetIcon from '@mui/icons-material/LockReset';
 
-import { useNavigate } from 'react-router-dom';
 import { Close, Delete, Search } from '@mui/icons-material';
 import AddUserDialog from './AddUserDialog';
 import DeleteConfirm from './DeleteConfirm';
-const initialRows = [
-  {
-    id: 1,
-    name: 'Asha Verma',
-    username: 'ashaV',
-    email: 'asha@gmail.com',
-    phone: '+91 9999999999',
-    verified: false,
-    status: 'Inactive',
-    subscription: 'Not Subscribed',
-    plan: 'Free',
-    joinedDate: '2024-09-12',
-  },
-  {
-    id: 2,
-    name: 'Sunil Joshi',
-    username: 'sunilj',
-    email: 'sunil@gmail.com',
-    phone: '+91 9876543210',
-    verified: true,
-    status: 'Active',
-    subscription: 'Subscribed',
-    plan: 'Pro',
-    joinedDate: '2024-12-01',
-  },
-  {
-    id: 3,
-    name: 'Priya Nair',
-    username: 'priyanair',
-    email: 'priya@gmail.com',
-    phone: '+91 9988776655',
-    verified: true,
-    status: 'Active',
-    subscription: 'Subscribed',
-    plan: 'Enterprise',
-    joinedDate: '2024-08-10',
-  },
-  {
-    id: 4,
-    name: 'Rohan Mehta',
-    username: 'rohanm',
-    email: 'rohan@gmail.com',
-    phone: '+91 9123456789',
-    verified: false,
-    status: 'Inactive',
-    subscription: 'Not Subscribed',
-    plan: 'Free',
-    joinedDate: '2025-01-20',
-  },
-  {
-    id: 5,
-    name: 'Neha Sharma',
-    username: 'nehas',
-    email: 'neha@gmail.com',
-    phone: '+91 8877665544',
-    verified: true,
-    status: 'Active',
-    subscription: 'Subscribed',
-    plan: 'Pro',
-    joinedDate: '2024-11-05',
-  },
-  {
-    id: 6,
-    name: 'Amit Patel',
-    username: 'amitp',
-    email: 'amit@gmail.com',
-    phone: '+91 9988001122',
-    verified: false,
-    status: 'Inactive',
-    subscription: 'Not Subscribed',
-    plan: 'Free',
-    joinedDate: '2024-07-15',
-  },
-  {
-    id: 7,
-    name: 'Deepika Rao',
-    username: 'deepikar',
-    email: 'deepika@gmail.com',
-    phone: '+91 9012345678',
-    verified: true,
-    status: 'Active',
-    subscription: 'Subscribed',
-    plan: 'Enterprise',
-    joinedDate: '2024-10-03',
-  },
-  {
-    id: 8,
-    name: 'Kunal Desai',
-    username: 'kunald',
-    email: 'kunal@gmail.com',
-    phone: '+91 9090909090',
-    verified: false,
-    status: 'Inactive',
-    subscription: 'Not Subscribed',
-    plan: 'Free',
-    joinedDate: '2024-06-18',
-  },
-  {
-    id: 9,
-    name: 'Sneha Kapoor',
-    username: 'snehak',
-    email: 'sneha@gmail.com',
-    phone: '+91 9445566778',
-    verified: true,
-    status: 'Active',
-    subscription: 'Subscribed',
-    plan: 'Pro',
-    joinedDate: '2024-05-12',
-  },
-  {
-    id: 10,
-    name: 'Raj Malhotra',
-    username: 'rajm',
-    email: 'raj@gmail.com',
-    phone: '+91 9333344455',
-    verified: false,
-    status: 'Inactive',
-    subscription: 'Not Subscribed',
-    plan: 'Free',
-    joinedDate: '2024-04-25',
-  },
-];
-
+import ViewUserDialog from './ViewUserDialog';
+import EditUserDialog from './EditUserDialog';
+import ResetPasswordDialog from './ResetPasswordDialog';
+import adminUserService from '../../../services/adminUserService';
 
 const filterOptions = {
-  status: ['Active', 'Inactive'],
+  status: ['active', 'inactive', 'suspended'],
   subscription: ['Subscribed', 'Not Subscribed'],
   plan: ['Free', 'Pro', 'Enterprise'],
   verification: ['Verified', 'Pending']
 };
 
-function descendingComparator(a, b, orderBy) {
-  if (b[orderBy] < a[orderBy]) return -1;
-  if (b[orderBy] > a[orderBy]) return 1;
-  return 0;
-}
-
-function getComparator(order, orderBy) {
-  return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-function stableSort(array, comparator) {
-  const stabilizedThis = array.map((el, index) => [el, index]);
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[0], b[0]);
-    return order !== 0 ? order : a[1] - b[1];
-  });
-  return stabilizedThis.map((el) => el[0]);
-}
-
 const UserTable = () => {
-  const [order, setOrder] = React.useState('asc');
-  const [orderBy, setOrderBy] = React.useState('name');
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [deleteUser, setDeleteUser] = React.useState(null);
   const [filters, setFilters] = React.useState({ status: [], subscription: [], plan: [], verification: [] });
-  const [userRows, setUserRows] = React.useState(initialRows);
+  const [userRows, setUserRows] = React.useState([]);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [totalCount, setTotalCount] = React.useState(0);
 
+  // Dialog states
   const [openAdd, setOpenAdd] = React.useState(false);
+  const [viewUser, setViewUser] = React.useState(null);
+  const [editUser, setEditUser] = React.useState(null);
+  const [resetPasswordUser, setResetPasswordUser] = React.useState(null);
+
   const isMobile = useMediaQuery('(max-width:768px)');
-  const navigate = useNavigate();
   const theme = useTheme();
   const primary = theme.palette.primary.main;
+
+  // Fetch users from API
+  const fetchUsers = React.useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // Build filters for API
+      const apiFilters = {};
+      if (filters.status.length > 0) {
+        apiFilters.status = filters.status.join(',');
+      }
+      if (filters.verification.length > 0) {
+        apiFilters.emailVerified = filters.verification.includes('Verified') ? 'true' : 'false';
+      }
+
+      const result = await adminUserService.getAllUsers({
+        page: page + 1,
+        limit: rowsPerPage,
+        search: searchQuery || undefined,
+        ...apiFilters,
+      });
+
+      if (result.success) {
+        setUserRows(result.data.users || []);
+        setTotalCount(result.data.total || 0);
+      } else {
+        setError(result.message || 'Failed to fetch users');
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred while fetching users');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, rowsPerPage, searchQuery, filters]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleStatusToggle = (id) => {
-    setUserRows((prevRows) =>
-      prevRows.map((user) =>
-        user.id === id ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' } : user
-      )
-    );
+  const handleStatusToggle = async (user) => {
+    try {
+      const result = await adminUserService.toggleUserStatus(user.id);
+      if (result.success) {
+        fetchUsers(); // Reload data
+      }
+    } catch (err) {
+      console.error('Error toggling user status:', err);
+    }
   };
-
-  const handleAddUser = (data) => {
-  const id = Date.now();
-  setUserRows((rows) => [
-    {
-      id,
-      name: data.fullname,
-      username: data.username,
-      email: data.email,
-      phone: data.phone,
-      plan: data.plan,
-      status: 'Active',
-      joinedDate: new Date().toLocaleDateString(),
-      subscription: data.plan === 'Free' ? 'Not Subscribed' : 'Subscribed',
-      verified: false,
-    },
-    ...rows,
-  ]);
-};
 
   const handleFilterChange = (category, value) => {
     setFilters((prev) => {
@@ -232,20 +120,6 @@ const UserTable = () => {
     setSearchQuery('');
   };
 
-  const filteredRows = userRows.filter((row) => {
-    const matchesSearch = Object.values(row).some((value) =>
-      String(value).toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    const matchesStatus = filters.status.length === 0 || filters.status.includes(row.status);
-    const matchesSubscription = filters.subscription.length === 0 || filters.subscription.includes(row.subscription);
-    const matchesPlan = filters.plan.length === 0 || filters.plan.includes(row.plan);
-    const matchesVerification =
-      filters.verification.length === 0 ||
-      (filters.verification.includes('Verified') && row.verified) ||
-      (filters.verification.includes('Pending') && !row.verified);
-
-    return matchesSearch && matchesStatus && matchesSubscription && matchesPlan && matchesVerification;
-  });
   const hasFilters = Object.values(filters).some(val => val.length > 0);
   const drawer = (
     <Scrollbar
@@ -418,82 +292,175 @@ const UserTable = () => {
 
           </Box>
 
-<AddUserDialog
-  open={openAdd}
-  onClose={() => setOpenAdd(false)}
-  onSubmit={handleAddUser}
-/>
+          {/* Error Alert */}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          {/* Dialogs */}
+          <AddUserDialog
+            open={openAdd}
+            onClose={() => setOpenAdd(false)}
+            onSuccess={fetchUsers}
+          />
+
+          <ViewUserDialog
+            open={Boolean(viewUser)}
+            user={viewUser}
+            onClose={() => setViewUser(null)}
+          />
+
+          <EditUserDialog
+            open={Boolean(editUser)}
+            user={editUser}
+            onClose={() => setEditUser(null)}
+            onSuccess={fetchUsers}
+          />
+
+          <ResetPasswordDialog
+            open={Boolean(resetPasswordUser)}
+            user={resetPasswordUser}
+            onClose={() => setResetPasswordUser(null)}
+            onSuccess={fetchUsers}
+          />
+
+          <DeleteConfirm
+            open={Boolean(deleteUser)}
+            user={deleteUser}
+            onClose={() => setDeleteUser(null)}
+            onSuccess={fetchUsers}
+          />
 
           <Paper variant="outlined">
             <Box sx={{ width: '100%', overflowX: 'auto' }}>
-              <TableContainer>
-                <Table size="medium" sx={{ minWidth: 700 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Contact</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Joined Date</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {stableSort(filteredRows, getComparator(order, orderBy))
-                      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                      .map((row) => (
+              {loading ? (
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                  <CircularProgress />
+                </Box>
+              ) : userRows.length === 0 ? (
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                  <Typography variant="body1" color="text.secondary">
+                    No users found
+                  </Typography>
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table size="medium" sx={{ minWidth: 700 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>User</TableCell>
+                        <TableCell>Contact</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Role</TableCell>
+                        <TableCell>Plan</TableCell>
+                        <TableCell>Joined Date</TableCell>
+                        <TableCell align="center">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {userRows.map((row) => (
                         <TableRow hover key={row.id}>
                           <TableCell>
-                            <Typography variant="subtitle2">{row.name}</Typography>
-                            <Typography variant="body2" color="text.secondary">{row.username}</Typography>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+                                {row.firstName?.[0]}{row.lastName?.[0]}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="subtitle2">
+                                  {row.firstName} {row.lastName}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  ID: {row.id}
+                                </Typography>
+                              </Box>
+                            </Box>
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2">{row.email}</Typography>
-                            <Typography variant="body2" color="text.secondary">{row.phone}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {row.phoneNumber || 'N/A'}
+                            </Typography>
                           </TableCell>
                           <TableCell>
-                            <Tooltip title={row.status === 'Active' ? 'Click to deactivate' : 'Click to activate'}>
-                              <Switch
-                                checked={row.status === 'Active'}
-                                onChange={() => handleStatusToggle(row.id)}
-                                size="small"
-                                color="success"
-                              />
-                            </Tooltip>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Tooltip title={row.status === 'active' ? 'Click to deactivate' : 'Click to activate'}>
+                                <Switch
+                                  checked={row.status === 'active'}
+                                  onChange={() => handleStatusToggle(row)}
+                                  size="small"
+                                  color="success"
+                                />
+                              </Tooltip>
+                              {row.emailVerified && (
+                                <Chip label="Verified" size="small" color="success" sx={{ height: 20 }} />
+                              )}
+                            </Box>
                           </TableCell>
-                          <TableCell>{row.joinedDate}</TableCell>
                           <TableCell>
-                            <Tooltip title="View Info">
-                              <IconButton
-                                color="error"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/admin/user-data/${row.id}`, { state: { user: row } });
-                                }}
-                              >
-                                <IconEye size={18} />
-                              </IconButton>
-                            </Tooltip>
-                           <Tooltip title="Delete User">
-  <IconButton color="error" onClick={() => setDeleteUser(row)}>
-    <Delete fontSize="small" />
-  </IconButton>
-</Tooltip>
-<DeleteConfirm
-  open={Boolean(deleteUser)}
-  name={deleteUser?.name}
-  onClose={() => setDeleteUser(null)}
-  onConfirm={() => {
-    setUserRows((rows) => rows.filter((u) => u.id !== deleteUser.id));
-    setDeleteUser(null);      
-  }}
-/>
-
+                            <Chip
+                              label={row.role}
+                              size="small"
+                              color={row.role === 'Admin' ? 'error' : 'default'}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {row.Plan?.name || 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {new Date(row.createdAt).toLocaleDateString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Box display="flex" gap={0.5}>
+                              <Tooltip title="View Details">
+                                <IconButton
+                                  size="small"
+                                  color="info"
+                                  onClick={() => setViewUser(row)}
+                                >
+                                  <IconEye size={18} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Edit User">
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  onClick={() => setEditUser(row)}
+                                >
+                                  <IconEdit size={18} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Reset Password">
+                                <IconButton
+                                  size="small"
+                                  color="warning"
+                                  onClick={() => setResetPasswordUser(row)}
+                                >
+                                  <LockResetIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete User">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => setDeleteUser(row)}
+                                >
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
                           </TableCell>
                         </TableRow>
                       ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </Box>
 
             <Box
@@ -522,11 +489,11 @@ const UserTable = () => {
               </Box>
 
               <Typography variant="body2" color="text.secondary">
-                Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, filteredRows.length)} of {filteredRows.length}
+                Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, totalCount)} of {totalCount}
               </Typography>
 
               <Pagination
-                count={Math.ceil(filteredRows.length / rowsPerPage)}
+                count={Math.ceil(totalCount / rowsPerPage)}
                 page={page + 1}
                 onChange={(e, value) => setPage(value - 1)}
                 shape="rounded"

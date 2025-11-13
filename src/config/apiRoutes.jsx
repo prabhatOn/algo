@@ -66,7 +66,7 @@ export const API_ROUTES = {
     start: (id) => `/strategies/${id}/start`,
     stop: (id) => `/strategies/${id}/stop`,
     stats: (id) => `/strategies/${id}/stats`,
-    public: '/strategies/public',
+    public: '/strategies/marketplace',
     clone: (id) => `/strategies/${id}/clone`,
   },
 
@@ -97,11 +97,12 @@ export const API_ROUTES = {
   // Wallet
   wallet: {
     base: '/wallet',
-    balance: '/wallet/balance',
+    balance: '/wallet',
     transactions: '/wallet/transactions',
-    deposit: '/wallet/deposit',
+    deposit: '/wallet/add-funds',
     withdraw: '/wallet/withdraw',
-    history: '/wallet/history',
+    history: '/wallet/transactions',
+    stats: '/wallet/stats',
   },
 
   // Support Tickets
@@ -112,7 +113,7 @@ export const API_ROUTES = {
     create: '/support',
     update: (id) => `/support/${id}`,
     close: (id) => `/support/${id}/close`,
-    reply: (id) => `/support/${id}/reply`,
+    reply: (id) => `/support/${id}/message`,
     stats: '/support/stats',
   },
 
@@ -127,6 +128,57 @@ export const API_ROUTES = {
     delete: (id) => `/notifications/${id}`,
     preferences: '/notifications/preferences',
   },
+
+  // Admin Routes
+  admin: {
+    users: {
+      base: '/admin/users',
+      byId: (id) => `/admin/users/${id}`,
+      list: '/admin/users',
+      create: '/admin/users',
+      update: (id) => `/admin/users/${id}`,
+      delete: (id) => `/admin/users/${id}`,
+      toggleStatus: (id) => `/admin/users/${id}/toggle-status`,
+      resetPassword: (id) => `/admin/users/${id}/reset-password`,
+      activity: (id) => `/admin/users/${id}/activity`,
+      stats: '/admin/users/stats',
+    },
+    strategies: {
+      base: '/admin/strategies',
+      byId: (id) => `/admin/strategies/${id}`,
+      list: '/admin/strategies',
+      update: (id) => `/admin/strategies/${id}`,
+      delete: (id) => `/admin/strategies/${id}`,
+      toggleStatus: (id) => `/admin/strategies/${id}/toggle-status`,
+      stats: '/admin/strategies/stats',
+    },
+    trades: {
+      base: '/admin/trades',
+      byId: (id) => `/admin/trades/${id}`,
+      list: '/admin/trades',
+      update: (id) => `/admin/trades/${id}`,
+      delete: (id) => `/admin/trades/${id}`,
+      stats: '/admin/trades/stats',
+    },
+    apiKeys: {
+      base: '/admin/api-keys',
+      byId: (id) => `/admin/api-keys/${id}`,
+      list: '/admin/api-keys',
+      update: (id) => `/admin/api-keys/${id}`,
+      delete: (id) => `/admin/api-keys/${id}`,
+      toggleStatus: (id) => `/admin/api-keys/${id}/toggle-status`,
+      stats: '/admin/api-keys/stats',
+    },
+    support: {
+      base: '/admin/support',
+      byId: (id) => `/admin/support/${id}`,
+      list: '/admin/support',
+      update: (id) => `/admin/support/${id}`,
+      reply: (id) => `/admin/support/${id}/reply`,
+      delete: (id) => `/admin/support/${id}`,
+      stats: '/admin/support/stats',
+    },
+  },
 };
 
 // Helper to build full URL
@@ -137,5 +189,8 @@ export const buildUrl = (path) => {
 
 // Export base URL for direct access
 export const API_BASE_URL = API_BASE;
+
+// Named export for convenience
+export const apiRoutes = API_ROUTES;
 
 export default API_ROUTES;

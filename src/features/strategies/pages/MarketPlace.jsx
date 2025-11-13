@@ -48,152 +48,7 @@ import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, S
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Breadcrumb from "../../../components/layout/full/shared/breadcrumb/Breadcrumb";
-const mockStrategies = [
-  {
-    id: "1",
-    name: "Forex Scalping Pro",
-    isActive: true,
-    type: "Private",
-    madeBy: "Admin",
-    createdBy: "Private",
-    segment: "Forex",
-    capital: 50000,
-    symbol: "EUR/USD",
-    symbolValue: 1.0845,
-    legs: 2,
-    isRunning: true,
-    isPublic: false,
-    performance: 12.5,
-    lastUpdated: "2 hours ago",
-    isFavorite: true,
-  },
-  {
-    id: "2",
-    name: "Crypto Momentum",
-    isActive: false,
-    type: "Public",
-    madeBy: "User",
-    createdBy: "Public",
-    segment: "Crypto",
-    capital: 25000,
-    symbol: "BTC/USDT",
-    symbolValue: 43250.5,
-    legs: 4,
-    isRunning: false,
-    isPublic: true,
-    performance: -3.2,
-    lastUpdated: "1 day ago",
-    isFavorite: false,
-  },
-  {
-    id: "3",
-    name: " Nifty Gold  Strategy",
-    isActive: true,
-    type: "Private",
-    madeBy: "User",
-    createdBy: "Private",
-    segment: "Indian",
-    capital: 100000,
-    symbol: "NIFTY",
-    symbolValue: 21850.75,
-    legs: 3,
-    isRunning: true,
-    isPublic: false,
-    performance: 8.7,
-    lastUpdated: "30 minutes ago",
-    isFavorite: true,
-  },
-  {
-    id: "4",
-    name: "Gold Swing Trading",
-    isActive: true,
-    type: "Public",
-    madeBy: "Admin",
-    createdBy: "Public",
-    segment: "Forex",
-    capital: 75000,
-    symbol: "XAU/USD",
-    symbolValue: 2045.3,
-    legs: 2,
-    isRunning: false,
-    isPublic: true,
-    performance: 15.3,
-    lastUpdated: "5 hours ago",
-    isFavorite: false,
-  },
-  {
-    id: "5",
-    name: "Spark Trading Bot",
-    isActive: false,
-    type: "Private",
-    madeBy: "Admin",
-    createdBy: "Private",
-    segment: "Crypto",
-    capital: 80000,
-    symbol: "ETH/USDT",
-    symbolValue: 2450.75,
-    legs: 5,
-    isRunning: false,
-    isPublic: false,
-    performance: 6.8,
-    lastUpdated: "3 days ago",
-    isFavorite: true,
-  },
-  {
-    id: "6",
-    name: "Iron AI Trading Bot",
-    isActive: false,
-    type: "Private",
-    madeBy: "Admin",
-    createdBy: "Private",
-    segment: "Crypto",
-    capital: 80000,
-    symbol: "ETH/USDT",
-    symbolValue: 2450.75,
-    legs: 5,
-    isRunning: false,
-    isPublic: false,
-    performance: 6.8,
-    lastUpdated: "3 days ago",
-    isFavorite: true,
-  },
-  {
-    id: "7",
-    name: "Forex Scalping Pro",
-    isActive: true,
-    type: "Private",
-    madeBy: "Admin",
-    createdBy: "Private",
-    segment: "Forex",
-    capital: 50000,
-    symbol: "EUR/USD",
-    symbolValue: 1.0845,
-    legs: 2,
-    isRunning: true,
-    isPublic: false,
-    performance: 12.5,
-    lastUpdated: "2 hours ago",
-    isFavorite: true,
-  },
-  {
-    id: "8",
-    name: "Crypto Momentum",
-    isActive: false,
-    type: "Public",
-    madeBy: "User",
-    createdBy: "Public",
-    segment: "Crypto",
-    capital: 25000,
-    symbol: "BTC/USDT",
-    symbolValue: 43250.5,
-    legs: 4,
-    isRunning: false,
-    isPublic: true,
-    performance: -3.2,
-    lastUpdated: "1 day ago",
-    isFavorite: false,
-  },
-];
+import { useAuth } from '../../../app/AuthProvider';
 
 const segmentColors = {
   Forex: { backgroundColor: "#dbeafe", color: "#1d4ed8" },
@@ -206,12 +61,13 @@ const typeColors = {
   Public: { backgroundColor: "#dcfce7", color: "#166534" },
 };
 export default function MarketPlace() {
-  const [strategies, setStrategies] = useState(mockStrategies);
-  const [loading, setLoading] = useState(false);
+  const [strategies, setStrategies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState(null);
   const [snack, setSnack] = useState({ open: false, message: '' });
   const navigate = useNavigate();
+  const { user } = useAuth();
   // load marketplace strategies from backend when component mounts
   useEffect(() => {
     let mounted = true;
@@ -219,9 +75,21 @@ export default function MarketPlace() {
       setLoading(true);
       try {
         const res = await strategyService.getPublicStrategies({ limit: 100 });
-        if (res.success && mounted) setStrategies(res.data || []);
+        console.log('Marketplace API response:', res);
+        if (res.success && mounted) {
+          const strategies = res.data || [];
+          console.log('Setting strategies:', strategies);
+          setStrategies(strategies);
+          if (strategies.length === 0) {
+            setSnack({ open: true, message: 'No public strategies available yet. Create a public strategy to see it here!' });
+          }
+        } else {
+          console.error('Failed to load strategies:', res.error);
+          setSnack({ open: true, message: res.error || 'Failed to load strategies' });
+        }
       } catch (err) {
         console.error('Failed to load marketplace strategies', err);
+        setSnack({ open: true, message: 'Error loading strategies: ' + (err.message || 'Unknown error') });
       } finally {
         if (mounted) setLoading(false);
       }
@@ -271,51 +139,60 @@ export default function MarketPlace() {
   };
 
   const toggleStrategyRunning = async (id) => {
+    // Optimistic update: toggle locally first for snappy UI, revert if API fails
     const s = strategies.find((st) => st.id === id || st._id === id);
     if (!s) return;
+    const prev = strategies;
+    setStrategies((prevList) =>
+      prevList.map((strategy) =>
+        (strategy.id === id || strategy._id === id)
+          ? { ...strategy, isRunning: !strategy.isRunning }
+          : strategy
+      )
+    );
     try {
       let res;
       if (s.isRunning) res = await strategyService.stopStrategy(id);
       else res = await strategyService.startStrategy(id);
       if (res.success) {
-        setStrategies((prev) =>
-          prev.map((strategy) =>
-            (strategy.id === id || strategy._id === id)
-              ? { ...strategy, isRunning: !s.isRunning }
-              : strategy
-          )
-        );
         setSnack({ open: true, message: s.isRunning ? 'Strategy stopped' : 'Strategy started' });
       } else {
+        // revert
+        setStrategies(prev);
         setSnack({ open: true, message: res.message || 'Failed to toggle running' });
       }
     } catch (err) {
       console.error(err);
+      setStrategies(prev);
       setSnack({ open: true, message: 'Error toggling running state' });
     }
   };
 
   const toggleStrategyPublic = async (id) => {
+    // optimistic update: flip locally then call API; revert on failure
     const s = strategies.find((st) => st.id === id || st._id === id);
     if (!s) return;
+    const prev = strategies;
+    setStrategies((prevList) =>
+      prevList.map((strategy) =>
+        (strategy.id === id || strategy._id === id)
+          ? { ...strategy, isPublic: !strategy.isPublic }
+          : strategy
+      )
+    );
     try {
       let res;
       if (s.isPublic) res = await strategyService.deactivateStrategy(id);
       else res = await strategyService.activateStrategy(id);
       if (res.success) {
-        setStrategies((prev) =>
-          prev.map((strategy) =>
-            (strategy.id === id || strategy._id === id)
-              ? { ...strategy, isPublic: !s.isPublic }
-              : strategy
-          )
-        );
         setSnack({ open: true, message: s.isPublic ? 'Strategy set to Private' : 'Strategy published' });
       } else {
+        setStrategies(prev);
         setSnack({ open: true, message: res.message || 'Failed to toggle visibility' });
       }
     } catch (err) {
       console.error(err);
+      setStrategies(prev);
       setSnack({ open: true, message: 'Error toggling visibility' });
     }
   };
@@ -331,34 +208,53 @@ export default function MarketPlace() {
   };
 
   const handleView = async (id) => {
+    // Try to show local data immediately, then attempt to refresh from API
+    const local = strategies.find((s) => s.id === id || s._id === id);
+    if (local) {
+      setSelectedStrategy(local);
+      setDetailsOpen(true);
+    }
     try {
       const res = await strategyService.getStrategyById(id);
       if (res.success) {
         setSelectedStrategy(res.data);
         setDetailsOpen(true);
-      } else setSnack({ open: true, message: res.message || 'Failed to load details' });
+      } else {
+        if (!local) setSnack({ open: true, message: res.message || 'Failed to load details' });
+      }
     } catch (err) {
       console.error(err);
-      setSnack({ open: true, message: 'Error loading details' });
+      if (!local) setSnack({ open: true, message: 'Error loading details' });
     }
   };
 
   const handleDelete = async (id) => {
     const ok = window.confirm('Are you sure you want to delete this strategy?');
     if (!ok) return;
+    // optimistic removal with revert on failure
+    const backup = strategies;
+    setStrategies((prev) => prev.filter((st) => st.id !== id && st._id !== id));
     try {
       const res = await strategyService.deleteStrategy(id);
       if (res.success) {
-        setStrategies((prev) => prev.filter((st) => st.id !== id && st._id !== id));
         setSnack({ open: true, message: 'Strategy deleted' });
-      } else setSnack({ open: true, message: res.message || 'Failed to delete' });
+      } else {
+        setStrategies(backup);
+        setSnack({ open: true, message: res.message || 'Failed to delete' });
+      }
     } catch (err) {
       console.error(err);
+      setStrategies(backup);
       setSnack({ open: true, message: 'Error deleting strategy' });
     }
   };
 
-  const handleCreate = () => navigate('/strategies/create');
+  const handleClone = async () => {
+    setSnack({ open: true, message: 'Clone functionality coming soon!' });
+  };
+
+  // navigate to the user create strategy route
+  const handleCreate = () => navigate('/user/create');
 
   const filteredStrategies = strategies.filter((strategy) => {
     const matchesSearch = strategy.name
@@ -748,6 +644,17 @@ export default function MarketPlace() {
         {/* Strategy Grid */}
         {loading ? (
           <Loader message="Loading strategies..." />
+        ) : filteredStrategies.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No strategies found
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {strategies.length === 0 
+                ? 'There are no public strategies available yet.' 
+                : 'Try adjusting your filters or search term.'}
+            </Typography>
+          </Box>
         ) : (
         <Grid
           container
@@ -949,20 +856,111 @@ export default function MarketPlace() {
                   </Paper>
 
                   {/* Action Buttons */}
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
+                  {strategy.user?.id === user?.id ? (
                     <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
                     >
-                      <Tooltip title="View Details">
-                        <IconButton
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleView(strategy.id)}
+                            sx={{
+                              "&:hover": {
+                                backgroundColor: "primary.light",
+                                color: "primary.main",
+                              },
+                            }}
+                          >
+                            <Visibility sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDelete(strategy.id)}
+                            sx={{
+                              "&:hover": {
+                                backgroundColor: "error.light",
+                                color: "error.main",
+                              },
+                            }}
+                          >
+                            <Delete sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                      >
+                        <Tooltip title={strategy.isRunning ? "Pause" : "Start"}>
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleStrategyRunning(strategy.id)}
+                            sx={{
+                              "&:hover": {
+                                backgroundColor: strategy.isRunning
+                                  ? "warning.light"
+                                  : "success.light",
+                                color: strategy.isRunning
+                                  ? "warning.main"
+                                  : "success.main",
+                              },
+                            }}
+                          >
+                            {strategy.isRunning ? (
+                              <Pause sx={{ fontSize: 16 }} />
+                            ) : (
+                              <PlayArrow sx={{ fontSize: 16 }} />
+                            )}
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title={strategy.isPublic ? "Public" : "Private"}>
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleStrategyPublic(strategy.id)}
+                            sx={{
+                              "&:hover": {
+                                backgroundColor: strategy.isPublic
+                                  ? "info.light"
+                                  : "grey.200",
+                                color: strategy.isPublic
+                                  ? "info.main"
+                                  : "text.secondary",
+                              },
+                            }}
+                          >
+                            {strategy.isPublic ? (
+                              <Public sx={{ fontSize: 16 }} />
+                            ) : (
+                              <Lock sx={{ fontSize: 16 }} />
+                            )}
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Tooltip title="Clone Strategy">
+                        <Button
                           size="small"
-                          onClick={() => handleView(strategy.id)}
+                          variant="outlined"
+                          startIcon={<AddOutlined />}
+                          onClick={() => handleClone()}
                           sx={{
                             "&:hover": {
                               backgroundColor: "primary.light",
@@ -970,77 +968,11 @@ export default function MarketPlace() {
                             },
                           }}
                         >
-                          <Visibility sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(strategy.id)}
-                          sx={{
-                            "&:hover": {
-                              backgroundColor: "error.light",
-                              color: "error.main",
-                            },
-                          }}
-                        >
-                          <Delete sx={{ fontSize: 16 }} />
-                        </IconButton>
+                          Clone
+                        </Button>
                       </Tooltip>
                     </Box>
-
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                    >
-                      <Tooltip title={strategy.isRunning ? "Pause" : "Start"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => toggleStrategyRunning(strategy.id)}
-                          sx={{
-                            "&:hover": {
-                              backgroundColor: strategy.isRunning
-                                ? "warning.light"
-                                : "success.light",
-                              color: strategy.isRunning
-                                ? "warning.main"
-                                : "success.main",
-                            },
-                          }}
-                        >
-                          {strategy.isRunning ? (
-                            <Pause sx={{ fontSize: 16 }} />
-                          ) : (
-                            <PlayArrow sx={{ fontSize: 16 }} />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-
-                      <Tooltip title={strategy.isPublic ? "Public" : "Private"}>
-                        <IconButton
-                          size="small"
-                          onClick={() => toggleStrategyPublic(strategy.id)}
-                          sx={{
-                            "&:hover": {
-                              backgroundColor: strategy.isPublic
-                                ? "info.light"
-                                : "grey.200",
-                              color: strategy.isPublic
-                                ? "info.main"
-                                : "text.secondary",
-                            },
-                          }}
-                        >
-                          {strategy.isPublic ? (
-                            <Public sx={{ fontSize: 16 }} />
-                          ) : (
-                            <Lock sx={{ fontSize: 16 }} />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </Box>
-
-                  {/* Running Indicator */}
+                  )}                  {/* Running Indicator */}
                   {strategy.isRunning && (
                     <Box
                       sx={{

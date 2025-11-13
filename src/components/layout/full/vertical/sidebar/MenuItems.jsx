@@ -69,14 +69,16 @@ const Menuitems = [
     id: uniqueId(),
     title: ' Create Strategy ',
     icon: IconCirclePlus,
-    href: '/strategies/create',
+    // route lives under /user/create per app routes
+    href: '/user/create',
     chipColor: 'secondary',
   },
   {
     id: uniqueId(),
-    title: '  Strategy MarketPlace ',
+    title: ' Strategy MarketPlace ',
     icon: IconCirclePlus,
-    href: '/strategies/create',
+    // marketplace is registered under /user/marketplace
+    href: '/user/marketplace',
     chipColor: 'secondary',
   },
   {

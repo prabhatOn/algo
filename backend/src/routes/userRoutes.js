@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/authMiddleware.js';
-import { getProfile, updateProfile, uploadAvatar } from '../controllers/userController.js';
+import { getProfile, updateProfile, uploadAvatar, changePassword } from '../controllers/userController.js';
 
 const router = express.Router();
 
@@ -12,6 +12,9 @@ router.put('/profile', authenticate, updateProfile);
 
 // Upload avatar
 router.post('/profile/avatar', authenticate, uploadAvatar);
+
+// Change password
+router.put('/change-password', authenticate, changePassword);
 
 // Get all users (admin only)
 router.get('/', authenticate, authorize('admin'), (req, res) => {

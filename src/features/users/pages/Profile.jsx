@@ -43,9 +43,10 @@ import {
 import { useRef, useState, useEffect } from "react";
 import LabelValueBox from "../components/LabelValueBox";
 import SectionCard from "../components/SectionCard";
+import AvatarUploadDialog from "../components/AvatarUploadDialog";
 import Breadcrumb from '../../../components/layout/full/shared/breadcrumb/Breadcrumb';
-import { useAuth } from '../../../app/AuthProvider';
 import { getUserProfile, updateUserProfile, uploadAvatar } from '../services/userService';
+import { useToast } from '../../../hooks/useToast';
 
 const BCrumb = [
   { to: '/dashboard/profile', title: 'Account' },
@@ -147,13 +148,14 @@ const UserProfile = () => {
   const [avatar, setAvatar] = useState("");
   const fileInputRef = useRef(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [avatarUploadOpen, setAvatarUploadOpen] = useState(false);
   const [sectionToEdit, setSectionToEdit] = useState("");
   const [sectionData, setSectionData] = useState({});
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const { user } = useAuth();
+  const { showToast } = useToast();
 
   // Fetch user profile on component mount
   useEffect(() => {
@@ -177,23 +179,19 @@ const UserProfile = () => {
     }
   };
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        // For now, just show preview. In a real app, you'd upload to server
-        const reader = new FileReader();
-        reader.onloadend = () => setAvatar(reader.result);
-        reader.readAsDataURL(file);
-
-        // TODO: Implement actual avatar upload
-        // const response = await uploadAvatar(file);
-        // if (response.success) {
-        //   setAvatar(response.data.avatarUrl);
-        // }
-      } catch (error) {
-        console.error('Error uploading avatar:', error);
+  const handleAvatarUpload = async (file) => {
+    try {
+      const response = await uploadAvatar(file);
+      if (response.success) {
+        setAvatar(response.data.avatarUrl || response.data.avatar);
+        showToast('Avatar uploaded successfully', 'success');
+        fetchUserProfile(); // Refresh profile data
+      } else {
+        showToast(response.error || 'Failed to upload avatar', 'error');
       }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      showToast(error.message || 'Failed to upload avatar', 'error');
     }
   };
 
@@ -207,10 +205,24 @@ const UserProfile = () => {
     try {
       setSaving(true);
       setError(null);
-      const response = await updateUserProfile(updatedData);
+      
+      // Check if password field is being edited
+      if (section === 'Basic Information' && updatedData.password && updatedData.password !== '********') {
+        // For password changes, we need a separate modal with current password
+        setError('Please use a secure password change flow. This feature requires your current password for security.');
+        setSaving(false);
+        return;
+      }
+      
+      // Regular profile update (exclude password field)
+      // eslint-disable-next-line no-unused-vars
+      const { password, ...profileData } = updatedData; // Remove password from profile update
+      const response = await updateUserProfile(profileData);
       if (response.success) {
-        setProfile(prev => ({ ...prev, ...updatedData }));
+        setProfile(prev => ({ ...prev, ...profileData }));
         setEditOpen(false);
+      } else {
+        setError(response.error || 'Failed to update profile');
       }
     } catch (err) {
       console.error('Failed to update profile:', err);
@@ -322,7 +334,7 @@ const UserProfile = () => {
             <Button
               variant="contained"
               size="small"
-              onClick={() => fileInputRef.current.click()}
+              onClick={() => setAvatarUploadOpen(true)}
               sx={{
                 fontWeight: 600,
                 height: 32,
@@ -340,7 +352,7 @@ const UserProfile = () => {
             type="file"
             accept="image/*"
             hidden
-            onChange={handleAvatarChange}
+            style={{ display: 'none' }}
           />
         </SectionCard>
 
@@ -451,6 +463,12 @@ const UserProfile = () => {
           data={sectionData}
           section={sectionToEdit}
           saving={saving}
+        />
+
+        <AvatarUploadDialog
+          open={avatarUploadOpen}
+          onClose={() => setAvatarUploadOpen(false)}
+          onUpload={handleAvatarUpload}
         />
       </Box>
     </>

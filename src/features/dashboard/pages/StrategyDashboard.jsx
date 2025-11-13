@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -16,7 +16,6 @@ import {
   Avatar,
   Grid,
   Divider,
- 
 } from "@mui/material";
 import {
   Search,
@@ -30,12 +29,20 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import { Wifi, WifiOff } from "@mui/icons-material";
+import { useNavigate } from 'react-router-dom';
 import Scrollbar from "../../../components/custom-scroll/Scrollbar";
 import StatsOverview from "../components/StatsOverview";
 import PerformanceChart from "../components/PerformanceChart";
 import StrategyTable from "../components/StrategyTable";
 import TopSubscribedStrategies from "../components/TopSubscribedStrategies";
-import Breadcrumb from "../../../components/layout/full/shared/breadcrumb/Breadcrumb"
+import Breadcrumb from "../../../components/layout/full/shared/breadcrumb/Breadcrumb";
+import DateRangePicker from '../../../components/shared/DateRangePicker';
+import ExportReportDialog from '../../../components/shared/ExportReportDialog';
+import NotificationsPanel from '../../../components/shared/NotificationsPanel';
+import QuickActions from '../../../components/shared/QuickActions';
+import useWebSocket from '../../../hooks/useWebSocket';
+import { useToast } from '../../../hooks/useToast';
 const topPerformers = [
   { name: "Alpha Momentum", return: "+24.5%", risk: "Medium", winRate: "78%" },
   { name: "Beta Scalper", return: "+18.2%", risk: "Low", winRate: "72%" },
@@ -47,7 +54,64 @@ const topPerformers = [
 ];
 
 const StrategyDashboard = () => {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [, setDateRange] = useState({
+    startDate: new Date(),
+    endDate: new Date(),
+  });
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+
+  // WebSocket for real-time strategy updates
+  const { isConnected, lastMessage } = useWebSocket('mock://localhost:8080', {
+    onMessage: (data) => {
+      console.log('Real-time strategy update:', data);
+    },
+  });
+
+  useEffect(() => {
+    if (lastMessage) {
+      console.log('Processing strategy update:', lastMessage);
+    }
+  }, [lastMessage]);
+
+  const handleDateRangeChange = (newRange) => {
+    setDateRange(newRange);
+    showToast('Date range updated', 'info');
+  };
+
+  const handleExport = async (exportData) => {
+    try {
+      console.log('Exporting strategies:', exportData);
+      showToast('Strategies exported successfully', 'success');
+    } catch {
+      showToast('Failed to export strategies', 'error');
+    }
+  };
+
+  const handleQuickAction = (action) => {
+    switch (action) {
+      case 'newStrategy':
+        navigate('/user/strategies/create');
+        break;
+      case 'newTrade':
+        showToast('New trade feature coming soon', 'info');
+        break;
+      case 'refresh':
+        window.location.reload();
+        break;
+      case 'export':
+        setExportDialogOpen(true);
+        break;
+      case 'notifications':
+        setNotificationsPanelOpen(true);
+        break;
+      default:
+        break;
+    }
+  };
   const [filterStatus, setFilterStatus] = useState("all");
   const [timeRange, setTimeRange] = useState("30d");
 
@@ -182,7 +246,38 @@ const StrategyDashboard = () => {
             </Box>
           </Grid>
         </Grid>
+
+        {/* Date Range Filter */}
+        <Box sx={{ mt: 3 }}>
+          <DateRangePicker onDateRangeChange={handleDateRangeChange} />
+        </Box>
+
+        {/* Live Connection Status */}
+        <Box display="flex" justifyContent="flex-end" sx={{ mt: 2 }}>
+          <Chip
+            icon={isConnected ? <Wifi /> : <WifiOff />}
+            label={isConnected ? 'Live Updates' : 'Disconnected'}
+            color={isConnected ? 'success' : 'default'}
+            size="small"
+          />
+        </Box>
       </Box>
+
+      {/* Quick Actions Speed Dial */}
+      <QuickActions onAction={handleQuickAction} />
+
+      {/* Export Report Dialog */}
+      <ExportReportDialog
+        open={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        onExport={handleExport}
+      />
+
+      {/* Notifications Panel */}
+      <NotificationsPanel
+        open={notificationsPanelOpen}
+        onClose={() => setNotificationsPanelOpen(false)}
+      />
     </Box>
   );
 };

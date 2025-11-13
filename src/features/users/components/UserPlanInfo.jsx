@@ -10,7 +10,12 @@ import {
   LinearProgress,
   useTheme,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import PaymentIcon from "@mui/icons-material/Payment";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
@@ -25,32 +30,187 @@ import { useState } from "react";
 import { PieChart, Pie, Cell } from "recharts";
 import { useWallet } from "../../../hooks/useWallet";
 import Loader from "../../../components/common/Loader";
+import { useEffect } from "react";
+import planService from "../../../services/planService";
+import { useToast } from "../../../hooks/useToast";
+import UpgradePlanDialog from "./UpgradePlanDialog";
+import DowngradePlanDialog from "./DowngradePlanDialog";
+import PaymentMethodDialog from "./PaymentMethodDialog";
+import BillingHistoryTable from "./BillingHistoryTable";
+import CancelSubscriptionDialog from "./CancelSubscriptionDialog";
 
 const UserPlanPage = () => {
-  const theme = useTheme();
-  const { balance, loading, error, refresh } = useWallet();
+  useTheme();
+  const { balance, currency, loading: walletLoading, error: walletError, refresh } = useWallet();
+  const { showToast } = useToast();
+  const [planData, setPlanData] = useState(null);
+  const [planLoading, setPlanLoading] = useState(true);
   
-  // Dummy plan data - in real app, would come from backend
-  const planData = {
-    name: "Pro Plan",
-    type: "Monthly",
-    price: "₹199",
-    totalDays: 30,
-    usedDays: 10,
-    remainingDays: 20,
-    startDate: "2024-01-01",
-    endDate: "2024-01-31",
+  // Dialog states
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [downgradeDialogOpen, setDowngradeDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  
+  // Fetch current user plan from backend
+  const fetchPlan = async () => {
+    setPlanLoading(true);
+    try {
+      const result = await planService.getCurrentPlan();
+      if (result.success && result.data) {
+        const plan = result.data.plan || result.data;
+        // Calculate days remaining
+        const startDate = new Date(plan.startDate);
+        const endDate = new Date(plan.endDate);
+        const today = new Date();
+        const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+        const usedDays = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+        const remainingDays = Math.max(0, totalDays - usedDays);
+        
+        setPlanData({
+          name: plan.name || "Free Plan",
+          type: plan.billingCycle || "Monthly",
+          price: plan.price ? `₹${plan.price}` : "₹0",
+          totalDays,
+          usedDays: Math.min(usedDays, totalDays),
+          remainingDays,
+          startDate: plan.startDate,
+          endDate: plan.endDate,
+          status: plan.status
+        });
+      } else {
+        // If no plan found, set default free plan
+        setPlanData({
+          name: "Free Plan",
+          type: "Monthly",
+          price: "₹0",
+          totalDays: 30,
+          usedDays: 0,
+          remainingDays: 30,
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'active'
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching plan:', err);
+      showToast('Error loading plan details', 'error');
+      // Set default plan on error
+      setPlanData({
+        name: "Free Plan",
+        type: "Monthly",
+        price: "₹0",
+        totalDays: 30,
+        usedDays: 0,
+        remainingDays: 30,
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'active'
+      });
+    } finally {
+      setPlanLoading(false);
+    }
   };
 
-  const usagePercentage = (planData.usedDays / planData.totalDays) * 100;
+  useEffect(() => {
+    fetchPlan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const chartData = [
+  const usagePercentage = planData ? (planData.usedDays / planData.totalDays) * 100 : 0;
+
+  const chartData = planData ? [
     { name: "Used", value: planData.usedDays, color: "#1976d2" },
     { name: "Remaining", value: planData.remainingDays, color: "#e0e0e0" },
-  ];
+  ] : [];
+  
   const [isActive, setIsActive] = useState(true);
   const handleSwitchChange = () => {
     setIsActive((prev) => !prev);
+  };
+  
+  const loading = walletLoading || planLoading;
+  const error = walletError;
+
+  // Handler functions for buttons
+  const handleUpgradePlan = () => {
+    setUpgradeDialogOpen(true);
+  };
+
+  const handleViewBilling = () => {
+    setBillingHistoryOpen(true);
+  };
+
+  const handleViewPastHistory = () => {
+    setBillingHistoryOpen(true);
+  };
+
+  const handleUpdatePaymentMethod = () => {
+    setPaymentDialogOpen(true);
+  };
+
+  const handleViewTransactionHistory = () => {
+    setBillingHistoryOpen(true);
+  };
+  
+  // Dialog action handlers
+  const handleUpgrade = async (plan, billingCycle) => {
+    try {
+      const response = await planService.upgradePlan(plan.id, billingCycle);
+      if (response.success) {
+        showToast('Plan upgraded successfully!', 'success');
+        fetchPlan();
+      }
+    } catch {
+      showToast('Failed to upgrade plan', 'error');
+    }
+  };
+
+  const handleDowngrade = async (plan, feedback) => {
+    try {
+      const response = await planService.downgradePlan(plan.id, feedback);
+      if (response.success) {
+        showToast('Plan downgrade scheduled successfully', 'success');
+        fetchPlan();
+      }
+    } catch {
+      showToast('Failed to downgrade plan', 'error');
+    }
+  };
+
+  const handlePaymentSave = async (paymentData) => {
+    try {
+      const response = await planService.updatePaymentMethod(paymentData);
+      if (response.success) {
+        showToast('Payment method updated successfully', 'success');
+      }
+    } catch {
+      showToast('Failed to update payment method', 'error');
+    }
+  };
+
+  const handleCancel = async (cancelData) => {
+    try {
+      const response = await planService.cancelSubscription(cancelData);
+      if (response.success) {
+        showToast('Subscription cancelled successfully', 'success');
+        fetchPlan();
+      }
+    } catch {
+      showToast('Failed to cancel subscription', 'error');
+    }
+  };
+
+  const handleDownloadInvoice = async (invoiceId) => {
+    try {
+      const response = await planService.downloadInvoice(invoiceId);
+      if (response.success) {
+        showToast('Invoice downloaded successfully', 'success');
+      }
+    } catch {
+      showToast('Failed to download invoice', 'error');
+    }
   };
 
   if (loading) {
@@ -65,9 +225,21 @@ const UserPlanPage = () => {
     );
   }
 
-  const walletBalance = balance?.balance || 0;
-  const currency = balance?.currency || 'INR';
-  const currencySymbol = currency === 'USD' ? '$' : '₹';
+  const walletBalance = Number(balance) || 0;
+  const walletCurrency = currency || 'INR';
+  const currencySymbol = walletCurrency === 'USD' ? '$' : '₹';
+
+  if (loading) {
+    return <Loader />;
+  }
+
+  if (!planData) {
+    return (
+      <Box sx={{ minHeight: "100vh", display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Alert severity="error">Failed to load plan information</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: "100vh" }}>
@@ -192,7 +364,12 @@ const UserPlanPage = () => {
                     {currencySymbol}{walletBalance.toFixed(2)}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">Available Balance</Typography>
-                  <Button variant="outlined" color="primary" sx={{ mt: 3}}>
+                  <Button 
+                    variant="outlined" 
+                    color="primary" 
+                    sx={{ mt: 3}}
+                    onClick={handleViewTransactionHistory}
+                  >
                     View Transaction History
                   </Button>
                 </Box>
@@ -221,17 +398,39 @@ const UserPlanPage = () => {
       }
     />
     <CardContent>
-      <Button variant="contained" fullWidth startIcon={<ArrowUpwardIcon />} sx={{ mb: 1 }}>
+      <Button 
+        variant="contained" 
+        fullWidth 
+        startIcon={<ArrowUpwardIcon />} 
+        sx={{ mb: 1 }}
+        onClick={handleUpgradePlan}
+      >
         Upgrade Plan
       </Button>
-      <Button variant="outlined" fullWidth startIcon={<AccountBalanceWalletIcon />}  sx={{ mb: 1 }} >
+      <Button 
+        variant="outlined" 
+        fullWidth 
+        startIcon={<AccountBalanceWalletIcon />}  
+        sx={{ mb: 1 }}
+        onClick={handleViewBilling}
+      >
         View Billing
       </Button>
     <Divider/>
-      <Button variant="text" fullWidth sx={{ justifyContent: "flex-start", mt: 1 }}>
+      <Button 
+        variant="text" 
+        fullWidth 
+        sx={{ justifyContent: "flex-start", mt: 1 }}
+        onClick={handleViewPastHistory}
+      >
         View Past History
       </Button>
-      <Button variant="text" fullWidth sx={{ justifyContent: "flex-start",mt:1  }}>
+      <Button 
+        variant="text" 
+        fullWidth 
+        sx={{ justifyContent: "flex-start",mt:1  }}
+        onClick={handleUpdatePaymentMethod}
+      >
         Update Payment Method
       </Button>
     </CardContent>
@@ -297,6 +496,54 @@ const UserPlanPage = () => {
 
         </Grid>
       </Grid>
+      
+      {/* Dialogs */}
+      <UpgradePlanDialog
+        open={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        currentPlan={planData}
+        onUpgrade={handleUpgrade}
+      />
+      
+      <DowngradePlanDialog
+        open={downgradeDialogOpen}
+        onClose={() => setDowngradeDialogOpen(false)}
+        currentPlan={planData}
+        targetPlan={{ name: 'Basic Plan', price: 19.99 }}
+        onDowngrade={handleDowngrade}
+      />
+      
+      <PaymentMethodDialog
+        open={paymentDialogOpen}
+        onClose={() => setPaymentDialogOpen(false)}
+        onSave={handlePaymentSave}
+      />
+      
+      <CancelSubscriptionDialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        currentPlan={planData}
+        onCancel={handleCancel}
+      />
+      
+      <Dialog
+        open={billingHistoryOpen}
+        onClose={() => setBillingHistoryOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Billing History</Typography>
+            <IconButton onClick={() => setBillingHistoryOpen(false)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <BillingHistoryTable onDownloadInvoice={handleDownloadInvoice} />
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

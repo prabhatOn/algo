@@ -14,7 +14,8 @@ import {
   deactivateStrategy,
   toggleFavorite,
   getMarketplaceStrategies,
-  getAllStrategies 
+  getAllStrategies,
+  debugPublicStrategies
 } from '../controllers/strategyController.js';
 import { 
   createStrategyValidation, 
@@ -24,8 +25,8 @@ import {
 
 const router = express.Router();
 
-// Public routes
-router.get('/marketplace', paginationValidation, getMarketplaceStrategies);
+// Marketplace route (requires authentication to filter user's own strategies)
+router.get('/marketplace', authenticate, paginationValidation, getMarketplaceStrategies);
 
 // User strategy routes
 router.get('/', authenticate, paginationValidation, getUserStrategies);
@@ -42,5 +43,8 @@ router.post('/:id/deactivate', authenticate, idParamValidation, deactivateStrate
 
 // Admin routes
 router.get('/admin/all', authenticate, roleCheck(['Admin']), getAllStrategies);
+
+// Debug route - remove in production
+router.get('/debug/public', debugPublicStrategies);
 
 export default router;

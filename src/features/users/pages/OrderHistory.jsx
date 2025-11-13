@@ -1,5 +1,5 @@
 // OrderHistory.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '@mui/material/styles';
 import {
   Card,
@@ -26,7 +26,10 @@ import {
   Select,
   Avatar,
   Tabs,
-  Tab
+  Tab,
+  CircularProgress,
+  Alert,
+  Tooltip
 } from '@mui/material';
 import {
   Download,
@@ -39,13 +42,20 @@ import {
   CheckCircleOutline,
   HourglassEmpty,
   Cancel,
-  ShowChart
+  ShowChart,
+  Visibility
 } from '@mui/icons-material';
 import Breadcrumb from '../../../components/layout/full/shared/breadcrumb/Breadcrumb';
+import tradeService from '../../../services/tradeService';
+import { useToast } from '../../../hooks/useToast';
+import ViewTradeDetailsDialog from '../../trade/components/ViewTradeDetailsDialog';
 
 const OrderHistory = () => {
   const theme = useTheme();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedMarkets, setSelectedMarkets] = useState([]);
   const [selectedBrokers, setSelectedBrokers] = useState([]);
   const [anchorElMarket, setAnchorElMarket] = useState(null);
@@ -53,6 +63,7 @@ const OrderHistory = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [tabValue, setTabValue] = useState(0);
+  const [viewTrade, setViewTrade] = useState(null);
 
   const marketOptions = ['Forex', 'Crypto', 'Indian'];
   const brokerOptions = {
@@ -61,131 +72,48 @@ const OrderHistory = () => {
     indian: ['Zerodha', 'Upstox', 'Angel One', 'ICICI Direct'],
   };
 
+  // Fetch trades from backend
+  const fetchTrades = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await tradeService.getTrades();
+      if (result.success) {
+        const trades = result.data.trades || result.data || [];
+        // Transform backend data to match frontend format
+        const transformedOrders = trades.map(trade => ({
+          id: trade.id,
+          market: trade.market || 'Forex',
+          symbol: trade.symbol,
+          type: trade.type || trade.action, // 'Buy' or 'Sell'
+          amount: trade.quantity || trade.amount,
+          price: trade.entryPrice || trade.price,
+          currentPrice: trade.currentPrice || trade.exitPrice || trade.entryPrice,
+          pnl: trade.profitLoss || trade.pnl || 0,
+          pnlPercentage: trade.profitLossPercentage || 0,
+          status: trade.status || 'Completed',
+          date: trade.createdAt || trade.date,
+          broker: trade.broker?.name || trade.brokerName || 'N/A',
+          brokerType: trade.broker?.type || 'forex',
+        }));
+        setOrders(transformedOrders);
+      } else {
+        showToast(result.error || 'Failed to fetch trades', 'error');
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching trades:', error);
+      showToast('Error loading order history', 'error');
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
 
-const orderData = [
-  {
-    id: "ORD001",
-    market: "Forex",
-    symbol: "EUR/USD",
-    type: "Buy",
-    amount: 10000,
-    price: 1.085,
-    currentPrice: 1.092,
-    pnl: 70.0,
-    pnlPercentage: 0.65,
-    status: "Completed",
-    date: "2024-01-15",
-    broker: "MetaTrader 5",
-    brokerType: "forex",
-  },
-  {
-    id: "ORD002",
-    market: "Crypto",
-    symbol: "BTC/USDT",
-    type: "Sell",
-    amount: 0.5,
-    price: 42500,
-    currentPrice: 41800,
-    pnl: 350.0,
-    pnlPercentage: 1.65,
-    status: "Completed",
-    date: "2024-01-14",
-    broker: "Binance",
-    brokerType: "crypto",
-  },
-  {
-    id: "ORD003",
-    market: "Indian",
-    symbol: "RELIANCE",
-    type: "Buy",
-    amount: 100,
-    price: 2450.75,
-    currentPrice: 2485.2,
-    pnl: 3445.0,
-    pnlPercentage: 1.41,
-    status: "Pending",
-    date: "2024-01-14",
-    broker: "Zerodha",
-    brokerType: "indian",
-  },
-  {
-    id: "ORD004",
-    market: "Forex",
-    symbol: "GBP/JPY",
-    type: "Sell",
-    amount: 5000,
-    price: 185.25,
-    currentPrice: 183.8,
-    pnl: 145.0,
-    pnlPercentage: 0.78,
-    status: "Completed",
-    date: "2024-01-13",
-    broker: "FXCM",
-    brokerType: "forex",
-  },
-  {
-    id: "ORD005",
-    market: "Crypto",
-    symbol: "ETH/USDT",
-    type: "Buy",
-    amount: 2.5,
-    price: 2650.3,
-    currentPrice: 2580.5,
-    pnl: -174.5,
-    pnlPercentage: -2.63,
-    status: "Failed",
-    date: "2024-01-13",
-    broker: "Coinbase Pro",
-    brokerType: "crypto",
-  },
-  {
-    id: "ORD006",
-    market: "Indian",
-    symbol: "TCS",
-    type: "Sell",
-    amount: 50,
-    price: 3890.5,
-    currentPrice: 3925.75,
-    pnl: -1762.5,
-    pnlPercentage: -0.91,
-    status: "Completed",
-    date: "2024-01-12",
-    broker: "Upstox",
-    brokerType: "indian",
-  },
-  {
-    id: "ORD007",
-    market: "Forex",
-    symbol: "USD/CAD",
-    type: "Buy",
-    amount: 8000,
-    price: 1.3425,
-    currentPrice: 1.3465,
-    pnl: 32.0,
-    pnlPercentage: 0.3,
-    status: "Completed",
-    date: "2024-01-12",
-    broker: "IG Markets",
-    brokerType: "forex",
-  },
-  {
-    id: "ORD008",
-    market: "Crypto",
-    symbol: "ADA/USDT",
-    type: "Buy",
-    amount: 1000,
-    price: 0.485,
-    currentPrice: 0.512,
-    pnl: 27.0,
-    pnlPercentage: 5.57,
-    status: "Completed",
-    date: "2024-01-11",
-    broker: "KuCoin",
-    brokerType: "crypto",
-  },
-]
+  useEffect(() => {
+    fetchTrades();
+  }, [fetchTrades]);
 
-  const filteredOrders = orderData.filter((order) => {
+  const filteredOrders = orders.filter((order) => {
     const matchSearch =
       order.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -222,11 +150,13 @@ const orderData = [
   };
 
   const getPnLDisplay = (pnl, pnlPercentage) => {
-    const isProfit = pnl >= 0;
+    const pnlValue = parseFloat(pnl) || 0;
+    const pnlPercentValue = parseFloat(pnlPercentage) || 0;
+    const isProfit = pnlValue >= 0;
     return (
       <Box color={isProfit ? 'green' : 'red'}>
-        <Typography variant="body2">{`${isProfit ? '+' : ''}$${pnl.toFixed(2)}`}</Typography>
-        <Typography variant="caption">({`${isProfit ? '+' : ''}${pnlPercentage.toFixed(2)}%`})</Typography>
+        <Typography variant="body2">{`${isProfit ? '+' : ''}$${pnlValue.toFixed(2)}`}</Typography>
+        <Typography variant="caption">({`${isProfit ? '+' : ''}${pnlPercentValue.toFixed(2)}%`})</Typography>
       </Box>
     );
   };
@@ -274,8 +204,8 @@ const orderData = [
           icon: Cancel,
         }, {
           title: 'Total P&L',
-          count: `$${filteredOrders.reduce((s, o) => s + o.pnl, 0).toFixed(2)}`,
-          bgcolor: filteredOrders.reduce((s, o) => s + o.pnl, 0) >= 0 ? 'success' : 'error',
+          count: `$${filteredOrders.reduce((s, o) => s + (parseFloat(o.pnl) || 0), 0).toFixed(2)}`,
+          bgcolor: filteredOrders.reduce((s, o) => s + (parseFloat(o.pnl) || 0), 0) >= 0 ? 'success' : 'error',
           icon: ShowChart,
         }].map((card, index) => {
           const iconColor = theme.palette[card.bgcolor]?.main || theme.palette.primary.main;
@@ -326,6 +256,15 @@ const orderData = [
         <Card>
           <CardHeader title={`Orders `} />
           <CardContent>
+            {loading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" py={8}>
+                <CircularProgress />
+              </Box>
+            ) : orders.length === 0 ? (
+              <Alert severity="info">
+                No order history found. Start trading to see your orders here!
+              </Alert>
+            ) : (
             <Box overflow="auto">
               <Table>
                 <TableHead>
@@ -341,6 +280,7 @@ const orderData = [
                     <TableCell>Status</TableCell>
                     <TableCell>Broker</TableCell>
                     <TableCell>Date</TableCell>
+                    <TableCell>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -362,14 +302,27 @@ const orderData = [
                       <TableCell>{getStatusChip(order.status)}</TableCell>
                       <TableCell>{order.broker}</TableCell>
                       <TableCell><CalendarToday fontSize="small" sx={{ mr: 1 }} />{new Date(order.date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Tooltip title="View Details">
+                          <IconButton
+                            color="primary"
+                            size="small"
+                            onClick={() => setViewTrade(order)}
+                          >
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </Box>
-            {filteredOrders.length === 0 && (
-              <Typography align="center" mt={4} color="textSecondary">No orders found.</Typography>
             )}
+            {!loading && filteredOrders.length === 0 && orders.length > 0 && (
+              <Typography align="center" mt={4} color="textSecondary">No orders match your filters.</Typography>
+            )}
+            {!loading && orders.length > 0 && (
             <Box mt={4} display="flex" flexDirection={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems="center" gap={2} p={2}>
               <Box display="flex" alignItems="center" gap={1}>
                 <Typography variant="body2">Rows:</Typography>
@@ -382,6 +335,7 @@ const orderData = [
               </Typography>
               <Pagination count={Math.ceil(filteredOrders.length / rowsPerPage)} page={page + 1} onChange={handleChangePage} shape="rounded" color="primary" />
             </Box>
+            )}
           </CardContent>
         </Card>
       )}
@@ -425,15 +379,18 @@ const orderData = [
                   lastDate: order.date,
                 };
               }
-              acc[key].totalAmount += order.amount;
-              acc[key].totalPrice += order.price * order.amount;
+              const amount = parseFloat(order.amount) || 0;
+              const price = parseFloat(order.price) || 0;
+              acc[key].totalAmount += amount;
+              acc[key].totalPrice += price * amount;
               acc[key].count += 1;
               acc[key].lastDate = order.date > acc[key].lastDate ? order.date : acc[key].lastDate;
               return acc;
             }, {})
           ).map(([symbol, data], index) => {
-            const avgPrice = data.totalPrice / data.totalAmount;
-            const mtm = (data.currentPrice - avgPrice) * data.totalAmount;
+            const avgPrice = data.totalAmount > 0 ? data.totalPrice / data.totalAmount : 0;
+            const currentPrice = parseFloat(data.currentPrice) || 0;
+            const mtm = (currentPrice - avgPrice) * data.totalAmount;
             return (
               <TableRow key={symbol}>
                 <TableCell>{index + 1}</TableCell>
@@ -461,6 +418,13 @@ const orderData = [
 </Card>
 
       )}
+
+      {/* View Trade Details Dialog */}
+      <ViewTradeDetailsDialog
+        open={Boolean(viewTrade)}
+        trade={viewTrade}
+        onClose={() => setViewTrade(null)}
+      />
     </Box>
   );
 };

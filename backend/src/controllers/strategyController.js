@@ -49,8 +49,12 @@ export const createStrategy = async (req, res) => {
     const userId = req.user.id;
     const { 
       name, segment, capital, symbol, symbolValue, legs, 
-      description, type, madeBy, createdBy 
+      description, type, madeBy 
     } = req.body;
+
+    // Get user's name for createdBy field
+    const user = await User.findByPk(userId, { attributes: ['name'] });
+    const createdByName = user ? user.name : 'Unknown User';
 
     const strategy = await Strategy.create({
       userId,
@@ -63,7 +67,7 @@ export const createStrategy = async (req, res) => {
       description,
       type: type || 'Private',
       madeBy: madeBy || 'User',
-      createdBy,
+      createdBy: createdByName,
       isActive: true,
       isRunning: false,
       isPublic: type === 'Public',
@@ -298,10 +302,20 @@ export const toggleFavorite = async (req, res) => {
 // Get marketplace (public strategies)
 export const getMarketplaceStrategies = async (req, res) => {
   try {
+    const userId = req.user?.id; // Get current user ID
     const { segment, page = 1, limit = 12, search } = req.query;
 
-    const where = { isPublic: true, type: 'Public' };
-    if (segment) where.segment = segment;
+    // Build where clause - show ALL public strategies (from all users including current user)
+    const where = { 
+      isPublic: 1  // Only show public strategies (isPublic = 1 or true)
+    };
+    
+    // Do NOT exclude current user's strategies - marketplace shows all public strategies
+    
+    if (segment && segment !== 'all') {
+      where.segment = segment;
+    }
+    
     if (search) {
       where[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
@@ -311,19 +325,34 @@ export const getMarketplaceStrategies = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
+    console.log('=== MARKETPLACE QUERY ===');
+    console.log('User ID:', userId);
+    console.log('Where clause:', JSON.stringify(where, null, 2));
+
     const strategies = await Strategy.findAndCountAll({
       where,
       limit: parseInt(limit),
       offset,
-      order: [['performance', 'DESC']],
+      order: [['createdAt', 'DESC']], // Changed from performance to createdAt
       include: [
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'username']
+          attributes: ['id', 'name', 'username', 'email'],
+          required: false
         }
       ]
     });
+
+    console.log(`Found ${strategies.count} marketplace strategies`);
+    console.log('Strategy details:', strategies.rows.map(s => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      isPublic: s.isPublic,
+      userId: s.userId,
+      userName: s.user?.name
+    })));
 
     res.json({
       success: true,
@@ -337,7 +366,11 @@ export const getMarketplaceStrategies = async (req, res) => {
     });
   } catch (error) {
     console.error('Get marketplace error:', error);
-    res.status(500).json({ error: 'Failed to fetch marketplace strategies' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch marketplace strategies',
+      message: error.message 
+    });
   }
 };
 
@@ -383,5 +416,34 @@ export const getAllStrategies = async (req, res) => {
   } catch (error) {
     console.error('Get all strategies error:', error);
     res.status(500).json({ error: 'Failed to fetch strategies' });
+  }
+};
+
+// Debug: Get all public strategies (without user filter)
+export const debugPublicStrategies = async (req, res) => {
+  try {
+    const strategies = await Strategy.findAll({
+      where: {
+        [Op.or]: [
+          { type: 'Public' },
+          { isPublic: true }
+        ]
+      },
+      attributes: ['id', 'name', 'type', 'isPublic', 'userId', 'segment'],
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'name']
+      }]
+    });
+    
+    res.json({
+      success: true,
+      count: strategies.length,
+      data: strategies
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
   }
 };

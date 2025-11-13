@@ -1,22 +1,18 @@
-import { Dialog, DialogTitle, DialogActions, Button } from '@mui/material';
+﻿import React from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 
-export default function DeleteConfirm({ open, name, onClose, onConfirm }) {
+export default function DeleteConfirm({ open, user, onClose, onConfirm }) {
   return (
-<Dialog
-  open={open}
-  onClose={onClose}
-  BackdropProps={{
-    sx: {
-      backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    },
-  }}
->
-      <DialogTitle sx={{ pr: 6 }}>Delete “{name}” user?</DialogTitle>
-      <DialogActions sx={{ pb: 2, pr: 3 }}>
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Delete User</DialogTitle>
+      <DialogContent>
+        <Typography>
+          Are you sure you want to delete {user?.firstName} {user?.lastName}?
+        </Typography>
+      </DialogContent>
+      <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button color="error" variant="contained" onClick={onConfirm}>
-          Delete
-        </Button>
+        <Button onClick={onConfirm} color="error">Delete</Button>
       </DialogActions>
     </Dialog>
   );

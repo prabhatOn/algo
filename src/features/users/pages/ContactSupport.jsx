@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Box,
   Container,
@@ -29,6 +29,8 @@ import {
   DialogContent,
   DialogActions,
   Avatar,
+  CircularProgress,
+  Alert,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
 import {
@@ -50,90 +52,92 @@ import {
 } from "@mui/icons-material"
 import Breadcrumb from "../../../components/layout/full/shared/breadcrumb/Breadcrumb"
 import TicketStatsCards from "../components/TicketStatsCards"
+import supportService from '../../../services/supportService';
+import { useToast } from '../../../hooks/useToast';
 
 
 
 
 const AdminContactSupport = () => {
-  const theme = useTheme()
-  const [tabValue, setTabValue] = useState(0)
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
-const [selectedTicket, setSelectedTicket] = useState(null);
-
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const [openDialog, setOpenDialog] = useState(false)
+  const [openNewTicket, setOpenNewTicket] = useState(false)
   const [replyMessage, setReplyMessage] = useState("")
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'medium', category: 'General' });
 
-// Ticket data
-const supportTickets = [
-  {
-    id: "TK-001",
-    subject: "Login Issues",
-    customer: "John Doe",
-    email: "john@example.com",
-    phone: "+1 (555) 123-4567",
-    company: "Tech Corp",
-    status: "open",
-    priority: "high",
-    category: "Technical",
-    assignedTo: "Sarah Wilson",
-    createdAt: "2024-01-15T10:30:00Z",
-    lastUpdated: "2024-01-15T14:20:00Z",
-    description:
-      "Unable to login to my account. Getting error message 'Invalid credentials' even with correct password.",
-  },
-  {
-    id: "TK-002",
-    subject: "Billing Question",
-    customer: "Jane Smith",
-    email: "jane@example.com",
-    phone: "+1 (555) 987-6543",
-    company: "Business Inc",
-    status: "in-progress",
-    priority: "medium",
-    category: "Billing",
-    assignedTo: "Mike Johnson",
-    createdAt: "2024-01-14T09:15:00Z",
-    lastUpdated: "2024-01-15T11:45:00Z",
-    description:
-      "I was charged twice for my subscription this month. Need clarification on billing.",
-  },
-  {
-    id: "TK-003",
-    subject: "Feature Request",
-    customer: "Bob Wilson",
-    email: "bob@example.com",
-    phone: "+1 (555) 456-7890",
-    company: "StartupXYZ",
-    status: "resolved",
-    priority: "low",
-    category: "Feature Request",
-    assignedTo: "Lisa Chen",
-    createdAt: "2024-01-13T16:20:00Z",
-    lastUpdated: "2024-01-14T10:30:00Z",
-    description:
-      "Would like to request a dark mode feature for the application.",
-  },
-  {
-    id: "TK-004",
-    subject: "Account Suspension",
-    customer: "Alice Brown",
-    email: "alice@example.com",
-    phone: "+1 (555) 321-0987",
-    company: "Enterprise Ltd",
-    status: "open",
-    priority: "urgent",
-    category: "Account",
-    assignedTo: "David Lee",
-    createdAt: "2024-01-15T08:45:00Z",
-    lastUpdated: "2024-01-15T13:10:00Z",
-    description:
-      "My account has been suspended without notice. Need immediate assistance to resolve this issue.",
-  },
-];
+  const fetchTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await supportService.getTickets();
+      if (result.success) {
+        const tickets = result.data.tickets || result.data || [];
+        // Transform backend data to match frontend format
+        const transformedTickets = tickets.map(ticket => ({
+          id: ticket.id,
+          subject: ticket.subject,
+          customer: ticket.user?.name || 'Unknown',
+          email: ticket.user?.email || '',
+          phone: ticket.user?.phone || 'N/A',
+          company: 'N/A',
+          status: ticket.status.toLowerCase(),
+          priority: ticket.priority.toLowerCase(),
+          category: ticket.category || 'General',
+          assignedTo: 'Support Team',
+          createdAt: ticket.createdAt,
+          lastUpdated: ticket.updatedAt,
+          description: ticket.description,
+          messages: ticket.messages || []
+        }));
+        setSupportTickets(transformedTickets);
+      } else {
+        showToast(result.error || 'Failed to fetch tickets', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      showToast('Error loading support tickets', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
 
-const getStatusChip = (status) => {
+  // Fetch tickets on mount
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
+  const handleCreateTicket = async () => {
+    if (!newTicket.subject.trim() || !newTicket.description.trim()) {
+      showToast('Please fill in all required fields', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await supportService.createTicket(newTicket);
+      if (result.success) {
+        showToast('Support ticket created successfully', 'success');
+        setOpenNewTicket(false);
+        setNewTicket({ subject: '', description: '', priority: 'medium', category: 'General' });
+        fetchTickets(); // Refresh the list
+      } else {
+        showToast(result.error || 'Failed to create ticket', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating ticket:', error);
+      showToast('Error creating support ticket', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getStatusChip = (status) => {
   const statusConfig = {
     open: { color: "error", icon: <Warning fontSize="small" /> },
     "in-progress": { color: "warning", icon: <Schedule fontSize="small" /> },
@@ -192,11 +196,29 @@ const getStatusChip = (status) => {
   setOpenDialog(true);
 };
 
-  const handleSendReply = () => {
-    // Handle reply logic here
-    console.log("Sending reply:", replyMessage)
-    setReplyMessage("")
-    setOpenDialog(false)
+  const handleSendReply = async () => {
+    if (!replyMessage.trim()) {
+      showToast('Please enter a message', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await supportService.replyToTicket(selectedTicket.id, { message: replyMessage });
+      if (result.success) {
+        showToast('Reply sent successfully', 'success');
+        setReplyMessage("");
+        setOpenDialog(false);
+        fetchTickets(); // Refresh to get updated ticket
+      } else {
+        showToast(result.error || 'Failed to send reply', 'error');
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      showToast('Error sending reply', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
 const TabPanel = ({ children, value, index }) => {
@@ -213,7 +235,7 @@ const TabPanel = ({ children, value, index }) => {
      <Breadcrumb title=" Contact Support " />
 
         {/* Stats Cards */}
-<TicketStatsCards stats={{ total: 40, open: 10, inProgress: 15, resolved: 15 }} />
+<TicketStatsCards stats={stats} />
 
 
         {/* Main Content */}
@@ -222,7 +244,7 @@ const TabPanel = ({ children, value, index }) => {
             title="Support Tickets"
             subheader="View and manage all customer support requests"
             action={
-              <Button variant="contained" startIcon={<Support />}>
+              <Button variant="contained" startIcon={<Support />} onClick={() => setOpenNewTicket(true)}>
                 New Ticket
               </Button>
             }
@@ -291,6 +313,15 @@ const TabPanel = ({ children, value, index }) => {
             
 
             {/* Tickets Table */}
+            {loading ? (
+              <Box display="flex" justifyContent="center" alignItems="center" py={8}>
+                <CircularProgress />
+              </Box>
+            ) : supportTickets.length === 0 ? (
+              <Alert severity="info" sx={{ m: 3 }}>
+                No support tickets found. Create your first ticket to get help!
+              </Alert>
+            ) : (
             <TableContainer component={Paper} variant="outlined">
               <Table>
                 <TableHead>
@@ -350,6 +381,7 @@ const TabPanel = ({ children, value, index }) => {
                 </TableBody>
               </Table>
             </TableContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -449,8 +481,76 @@ const TabPanel = ({ children, value, index }) => {
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleSendReply} startIcon={<Reply />}>
-              Send Reply
+            <Button variant="contained" onClick={handleSendReply} startIcon={<Reply />} disabled={submitting}>
+              {submitting ? 'Sending...' : 'Send Reply'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* New Ticket Dialog */}
+        <Dialog open={openNewTicket} onClose={() => setOpenNewTicket(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Create New Support Ticket</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Subject"
+                  placeholder="Brief description of your issue"
+                  value={newTicket.subject}
+                  onChange={(e) => setNewTicket({ ...newTicket, subject: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    value={newTicket.priority}
+                    label="Priority"
+                    onChange={(e) => setNewTicket({ ...newTicket, priority: e.target.value })}
+                  >
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="urgent">Urgent</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={newTicket.category}
+                    label="Category"
+                    onChange={(e) => setNewTicket({ ...newTicket, category: e.target.value })}
+                  >
+                    <MenuItem value="General">General</MenuItem>
+                    <MenuItem value="Technical">Technical</MenuItem>
+                    <MenuItem value="Billing">Billing</MenuItem>
+                    <MenuItem value="Account">Account</MenuItem>
+                    <MenuItem value="Feature Request">Feature Request</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={5}
+                  label="Description"
+                  placeholder="Please describe your issue in detail..."
+                  value={newTicket.description}
+                  onChange={(e) => setNewTicket({ ...newTicket, description: e.target.value })}
+                  required
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenNewTicket(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleCreateTicket} startIcon={<Support />} disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create Ticket'}
             </Button>
           </DialogActions>
         </Dialog>
