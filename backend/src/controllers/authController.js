@@ -28,8 +28,8 @@ const register = async (req, res) => {
     });
 
     // Generate tokens
-    const token = generateToken({ id: user.id, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user.id });
+  const token = generateToken({ id: user.id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user.id, role: user.role });
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -71,8 +71,8 @@ const login = async (req, res) => {
     }
 
     // Generate tokens
-    const token = generateToken({ id: user.id, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user.id });
+  const token = generateToken({ id: user.id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user.id, role: user.role });
 
     res.json({
       message: 'Login successful',

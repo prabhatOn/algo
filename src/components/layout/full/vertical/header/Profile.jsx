@@ -9,7 +9,7 @@ import { Stack } from '@mui/system';
 import ProfileImg from '../../../../../assets/images/profile/user-1.jpg';
 import unlimitedImg from '../../../../../assets/images/backgrounds/unlimited-bg.png';
 import Scrollbar from '../../../../../components/custom-scroll/Scrollbar';
-import { useAuth } from '../../../../../app/AuthProvider';
+import { useAuth } from '../../../../../app/authContext';
 import { useToast } from '../../../../../hooks/useToast';
 
 const Profile = () => {

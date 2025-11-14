@@ -1,17 +1,33 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import { useTheme } from '@mui/material/styles';
 import { Stack, Typography, Avatar, Box, Grid } from '@mui/material';
 import { IconArrowUpLeft } from '@tabler/icons-react';
 import DashboardCard from '../../../components/common/DashboardCard';
+import PropTypes from 'prop-types';
 
-const TotalROI = () => {
+const TotalROI = ({ stats }) => {
   const theme = useTheme();
 
   const primary = theme.palette.primary.main;
   const primaryLight = theme.palette.primary.light;
   const greyLight = theme.palette.grey[200];
   const successLight = theme.palette.success.light;
+
+  const computedStats = useMemo(() => {
+    const total = stats?.total ?? 0;
+    const active = stats?.active ?? 0;
+    const running = stats?.running ?? 0;
+    const publicCount = stats?.public ?? 0;
+    const roi = total ? ((running / total) * 100).toFixed(1) : 0;
+    return {
+      total,
+      active,
+      running,
+      publicCount,
+      roi,
+    };
+  }, [stats]);
 
   const optionsDonutChart = {
     chart: {
@@ -22,7 +38,7 @@ const TotalROI = () => {
       height: 160,
     },
     colors: [primary, primaryLight, greyLight],
-    labels: ['2025 ROI', '2024 ROI', 'Other'],
+    labels: ['Running', 'Active', 'Other'],
     plotOptions: {
       pie: {
         donut: {
@@ -39,15 +55,15 @@ const TotalROI = () => {
               show: true,
               fontSize: '18px',
               fontWeight: 600,
-              formatter: () => '10%',
+              formatter: () => `${computedStats.roi}%`,
               offsetY: 10,
             },
             total: {
               show: true,
-              label: 'Total ROI',
+              label: 'Running Share',
               fontSize: '14px',
               fontWeight: 500,
-              formatter: () => '10%',
+              formatter: () => `${computedStats.roi}%`,
             },
           },
         },
@@ -68,24 +84,28 @@ const TotalROI = () => {
     ],
   };
 
-  const seriesDonutChart = [38, 40, 22]; // Total 100 = 10% ROI (e.g., scaled or dummy)
+  const seriesDonutChart = useMemo(() => {
+    if (!stats) return [38, 40, 22];
+    const others = Math.max(computedStats.total - computedStats.running - computedStats.active, 0);
+    return [computedStats.running, computedStats.active, others];
+  }, [stats, computedStats]);
 
   return (
     <DashboardCard title="Total ROI">
       <Grid container spacing={3}>
         <Grid item xs={7}>
           <Typography variant="h3" fontWeight={700}>
-            10%
+            {computedStats.roi}%
           </Typography>
           <Stack direction="row" spacing={1} mt={4} alignItems="center">
             <Avatar sx={{ bgcolor: successLight, width: 27, height: 27 }}>
               <IconArrowUpLeft width={20} color="#39B69A" />
             </Avatar>
             <Typography variant="subtitle2" fontWeight={600}>
-              +2%
+              {computedStats.running.toLocaleString()} running
             </Typography>
             <Typography variant="subtitle2" color="textSecondary">
-              since last year
+              of {computedStats.total.toLocaleString()} strategies
             </Typography>
           </Stack>
 
@@ -105,7 +125,7 @@ const TotalROI = () => {
           </Stack>
         </Grid>
 
-        {/* <Grid size={5}>
+        <Grid item xs={5}>
           <Box>
             <Chart
               options={optionsDonutChart}
@@ -114,10 +134,19 @@ const TotalROI = () => {
               height={130}
             />
           </Box>
-        </Grid> */}
+        </Grid>
       </Grid>
     </DashboardCard>
   );
 };
 
 export default TotalROI;
+
+TotalROI.propTypes = {
+  stats: PropTypes.shape({
+    total: PropTypes.number,
+    active: PropTypes.number,
+    running: PropTypes.number,
+    public: PropTypes.number,
+  }),
+};

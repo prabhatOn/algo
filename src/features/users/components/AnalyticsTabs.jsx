@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Card,
   CardContent,
@@ -19,6 +19,9 @@ import {
 } from "@mui/material"
 import { ExpandMore } from "@mui/icons-material"
 import { styled } from "@mui/material/styles"
+import adminUserService from "../../../services/adminUserService"
+import adminApiKeyService from "../../../services/adminApiKeyService"
+import { adminStrategyService } from "../../../services/adminStrategyService"
 
 const StyledCard = styled(Card)(({ theme }) => ({
   border: "none",
@@ -168,96 +171,135 @@ export default function AnalyticsTabs() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
   const [value, setValue] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    users: null,
+    apis: null,
+    strategies: null,
+  })
 
   const handleChange = (_, newValue) => setValue(newValue)
 
-  const tabs = [
-    {
-      label: "Users",
-      sections: [
-        {
-          title: "Usage Breakdown",
-          data: [
-            { label: "Active Users", value: 723, total: 847 },
-            { label: "Inactive Users", value: 124, total: 847 },
-            { label: "Premium Users", value: 156, total: 847 },
-          ],
-          type: "progress",
-          colorDot: "#2196f3",
-          gradient: "linear-gradient(135deg, #e3f2fd, #bbdefb)",
-        },
-        {
-          title: "Growth Metrics",
-          data: [
-            { label: "New This Month", value: "+89", positive: true },
-            { label: "Churned This Month", value: "-12", positive: false },
-            { label: "Net Growth", value: "+77", positive: true },
-          ],
-          type: "card",
-          colorDot: "#4caf50",
-        
-          gradient: "linear-gradient(135deg, #e8f5e8, #c8e6c9)",
-        },
-      ],
-    },
-    {
-      label: "APIs",
-      sections: [
-        {
-          title: "API Distribution",
-          data: [
-            { name: "Binance", count: 45, color: "#ffc107" },
-            { name: "Coinbase Pro", count: 38, color: "#2196f3" },
-            { name: "Kraken", count: 29, color: "#9c27b0" },
-            { name: "Others", count: 44, color: "#757575" },
-          ],
-          type: "card",
-          colorDot: "#00bcd4",
-          gradient: "linear-gradient(135deg, #e0f2f1, #b2dfdb)",
-        },
-        {
-          title: "API Health Status",
-          data: [
-            { label: "Active APIs", value: 142, status: "success" },
-            { label: "Rate Limited", value: 8, status: "warning" },
-            { label: "Failed", value: 6, status: "error" },
-          ],
-          type: "card",
-          colorDot: "#ff9800",
-          gradient: "linear-gradient(135deg, #fff3e0, #ffcc80)",
-        },
-      ],
-    },
-    {
-      label: "Strategies",
-      sections: [
-        {
-          title: "Strategy Types",
-          data: [
-            { name: "Momentum", count: 89, percentage: 38 },
-            { name: "Mean Reversion", count: 67, percentage: 29 },
-            { name: "Arbitrage", count: 45, percentage: 19 },
-            { name: "Grid Trading", count: 33, percentage: 14 },
-          ],
-          type: "progress",
-          colorDot: "#9c27b0",
-          gradient: "linear-gradient(135deg, #e3f2fd, #bbdefb)",
-        },
-        {
-          title: "Performance Status",
-          data: [
-            { label: "Active Strategies", value: 198, status: "success" },
-            { label: "Paused", value: 21, status: "warning" },
-            { label: "Inactive", value: 15, status: "neutral" },
-          ],
-          type: "card",
-          colorDot: "#3f51b5",
-       
-          gradient: "linear-gradient(135deg, #e8f5e8, #c8e6c9)",
-        },
-      ],
-    },
-  ]
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const [userStats, apiStats, strategyStats] = await Promise.all([
+          adminUserService.getUserStats(),
+          adminApiKeyService.getApiKeyStats(),
+          adminStrategyService.getStrategyStats(),
+        ])
+
+        setStats({
+          users: userStats.success ? userStats.data : null,
+          apis: apiStats.success ? (apiStats.data?.data || apiStats.data) : null,
+          strategies: strategyStats.success ? strategyStats.data : null,
+        })
+      } catch (error) {
+        console.error('Error fetching analytics stats:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [])
+
+  const tabs = useMemo(() => {
+    const userStats = stats.users || {}
+    const apiOverview = stats.apis?.overview || {}
+    const strategyStats = stats.strategies || {}
+    const totalStrategies = strategyStats.total || 0
+    const segments = (strategyStats.bySegment || []).map((item) => {
+      const count = Number(item.count ?? item.dataValues?.count ?? 0)
+      return {
+        name: item.segment || 'Unknown',
+        count,
+        percentage: totalStrategies ? Number(((count / totalStrategies) * 100).toFixed(1)) : 0,
+      }
+    })
+
+    const apiDistribution = [
+      { name: 'Indian', count: Number(apiOverview.indian || 0) },
+      { name: 'Forex', count: Number(apiOverview.forex || 0) },
+      { name: 'Crypto', count: Number(apiOverview.crypto || 0) },
+    ].filter((item) => item.count > 0)
+
+    return [
+      {
+        label: 'Users',
+        sections: [
+          {
+            title: 'Usage Breakdown',
+            data: [
+              { label: 'Active Users', value: Number(userStats.active || 0), total: Number(userStats.total || 1) },
+              { label: 'Inactive Users', value: Number(userStats.inactive || 0), total: Number(userStats.total || 1) },
+              { label: 'Verified Users', value: Number(userStats.verified || 0), total: Number(userStats.total || 1) },
+            ],
+            type: 'progress',
+            colorDot: '#2196f3',
+            gradient: 'linear-gradient(135deg, #e3f2fd, #bbdefb)',
+          },
+          {
+            title: 'Growth Metrics',
+            data: [
+              { label: 'New This Week', value: `+${userStats.recentSignups || 0}`, positive: true },
+              { label: 'Total Users', value: userStats.total || 0, positive: true },
+              { label: 'Pending Verification', value: Number(userStats.pending || 0), positive: false },
+            ],
+            type: 'card',
+            colorDot: '#4caf50',
+            gradient: 'linear-gradient(135deg, #e8f5e8, #c8e6c9)',
+          },
+        ],
+      },
+      {
+        label: 'APIs',
+        sections: [
+          {
+            title: 'API Distribution',
+            data: apiDistribution.length ? apiDistribution : [{ name: 'No data', count: 0 }],
+            type: 'card',
+            colorDot: '#00bcd4',
+            gradient: 'linear-gradient(135deg, #e0f2f1, #b2dfdb)',
+          },
+          {
+            title: 'API Health Status',
+            data: [
+              { label: 'Active APIs', value: Number(apiOverview.active || 0), status: 'success' },
+              { label: 'Pending Approval', value: Number(apiOverview.pending || 0), status: 'warning' },
+              { label: 'Inactive', value: Number(apiOverview.inactive || 0), status: 'error' },
+            ],
+            type: 'card',
+            colorDot: '#ff9800',
+            gradient: 'linear-gradient(135deg, #fff3e0, #ffcc80)',
+          },
+        ],
+      },
+      {
+        label: 'Strategies',
+        sections: [
+          {
+            title: 'Strategy Segments',
+            data: segments.length ? segments : [{ name: 'No strategies', count: 0, percentage: 0 }],
+            type: 'progress',
+            colorDot: '#9c27b0',
+            gradient: 'linear-gradient(135deg, #e3f2fd, #bbdefb)',
+          },
+          {
+            title: 'Performance Status',
+            data: [
+              { label: 'Active Strategies', value: Number(strategyStats.active || 0), status: 'success' },
+              { label: 'Running', value: Number(strategyStats.running || 0), status: 'success' },
+              { label: 'Public', value: Number(strategyStats.public || 0), status: 'warning' },
+            ],
+            type: 'card',
+            colorDot: '#3f51b5',
+            gradient: 'linear-gradient(135deg, #e8f5e8, #c8e6c9)',
+          },
+        ],
+      },
+    ]
+  }, [stats])
 
   return (
     <StyledCard>
@@ -267,33 +309,41 @@ export default function AnalyticsTabs() {
         </Typography>
       </Box>
 
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <StyledTabs value={value} onChange={handleChange} aria-label="analytics tabs" variant={isMobile ? "fullWidth" : "standard"}>
-            {tabs.map((tab, index) => (
-              <Tab key={index} label={tab.label} />
-            ))}
-          </StyledTabs>
-        </Box>
+      {loading ? (
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="body2" color="text.secondary">
+            Loading analytics…
+          </Typography>
+        </CardContent>
+      ) : (
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <StyledTabs value={value} onChange={handleChange} aria-label="analytics tabs" variant={isMobile ? "fullWidth" : "standard"}>
+              {tabs.map((tab, index) => (
+                <Tab key={index} label={tab.label} />
+              ))}
+            </StyledTabs>
+          </Box>
 
-        {tabs.map((tab, tabIndex) => (
-          <TabPanel key={tabIndex} value={value} index={tabIndex}>
-            {isMobile ? (
-              <Box>
-                {tab.sections.map((section, i) => (
-                  <MobileAccordionContent key={i} title={section.title} data={section.data} colorDot={section.colorDot} />
-                ))}
-              </Box>
-            ) : (
-              <Grid container spacing={3}>
-                {tab.sections.map((section, i) => (
-                  <DesktopSection key={i} {...section} />
-                ))}
-              </Grid>
-            )}
-          </TabPanel>
-        ))}
-      </CardContent>
+          {tabs.map((tab, tabIndex) => (
+            <TabPanel key={tabIndex} value={value} index={tabIndex}>
+              {isMobile ? (
+                <Box>
+                  {tab.sections.map((section, i) => (
+                    <MobileAccordionContent key={i} title={section.title} data={section.data} colorDot={section.colorDot} />
+                  ))}
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  {tab.sections.map((section, i) => (
+                    <DesktopSection key={i} {...section} />
+                  ))}
+                </Grid>
+              )}
+            </TabPanel>
+          ))}
+        </CardContent>
+      )}
     </StyledCard>
   )
 }

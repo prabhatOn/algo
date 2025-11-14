@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import {
   useTheme,
@@ -22,6 +21,7 @@ import {
 } from '@mui/material';
 import BlankCard from '../../../components/shared/BlankCard';
 import Scrollbar from '../../../components/custom-scroll/Scrollbar';
+import PropTypes from 'prop-types';
 const generateCumulativeData = (length, volatility = 2, start = 100) => {
   const data = [start];
   for (let i = 1; i < length; i++) {
@@ -66,14 +66,22 @@ const chartDataByRange = {
 
 
 
-const Followers = () => {
+const Followers = ({ segmentStats = [], recentStrategies = [], selectedStrategy = null }) => {
   const theme = useTheme();
 
 
   const [activeTab, setActiveTab] = useState(0);
   const [timeRange, setTimeRange] = useState('1W');
 
-  const selectedChartData = chartDataByRange[timeRange];
+  const backendChartData = useMemo(() => {
+    if (!segmentStats?.length) return null;
+    return {
+      categories: segmentStats.map((item) => item.segment || 'Uncategorized'),
+      data: segmentStats.map((item) => Number(item?.dataValues?.count ?? item?.count ?? 0)),
+    };
+  }, [segmentStats]);
+
+  const selectedChartData = backendChartData || chartDataByRange[timeRange];
 const yValues = selectedChartData.data;
 const yMin = Math.min(...yValues);
 const yMax = Math.max(...yValues);
@@ -133,7 +141,9 @@ const options = useMemo(() => {
       theme: isDarkMode ? 'dark' : 'light',
       y: {
         formatter: (value) =>
-          `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`,
+          backendChartData
+            ? `${value} strategies`
+            : `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`,
       },
     },
     xaxis: {
@@ -145,27 +155,85 @@ const options = useMemo(() => {
         },
       },
     },
-    yaxis: {
-      min: -yAbsMax,
-      max: yAbsMax,
-      labels: {
-        formatter: (val) => `${val >= 0 ? '+' : ''}${val}%`,
-        style: {
-          colors: [labelColor],
-          fontSize: '12px',
+    yaxis: backendChartData
+      ? {
+          min: 0,
+          labels: {
+            formatter: (val) => `${val}`,
+            style: {
+              colors: [labelColor],
+              fontSize: '12px',
+            },
+          },
+        }
+      : {
+          min: -yAbsMax,
+          max: yAbsMax,
+          labels: {
+            formatter: (val) => `${val >= 0 ? '+' : ''}${val}%`,
+            style: {
+              colors: [labelColor],
+              fontSize: '12px',
+            },
+          },
         },
-      },
-    },
   };
-}, [theme.palette.mode, selectedChartData, yAbsMax]);
+}, [theme.palette.mode, selectedChartData, yAbsMax, backendChartData]);
 
 
 const series = [
   {
-    name: 'Net Value',
+    name: backendChartData ? 'Strategies' : 'Net Value',
     data: selectedChartData.data,
   },
 ];
+
+const strategyDetails = useMemo(() => ({
+  name: selectedStrategy?.name || 'Momentum Surge A',
+  createdBy: selectedStrategy?.user?.name || selectedStrategy?.createdBy || 'Unknown',
+  createdOn: selectedStrategy?.createdAt
+    ? new Date(selectedStrategy.createdAt).toLocaleDateString()
+    : 'N/A',
+  lastUpdated: selectedStrategy?.updatedAt
+    ? new Date(selectedStrategy.updatedAt).toLocaleDateString()
+    : 'N/A',
+  type: selectedStrategy?.type || (selectedStrategy?.isPublic ? 'Public' : 'Private'),
+  segment: selectedStrategy?.segment || selectedStrategy?.category || 'General',
+  riskLevel: selectedStrategy?.riskLevel || 'Moderate',
+  marketFocus: selectedStrategy?.marketFocus || 'Multi-asset',
+  timeframe: selectedStrategy?.timeframe || '15m - 1h',
+  description:
+    selectedStrategy?.description ||
+    'This strategy description will appear once provided by the strategy owner.',
+}), [selectedStrategy]);
+
+const performanceMetrics = useMemo(() => {
+  if (!recentStrategies?.length) return [];
+  const total = recentStrategies.length;
+  const active = recentStrategies.filter((item) => item.isActive).length;
+  const running = recentStrategies.filter((item) => item.isRunning).length;
+  const isPublic = recentStrategies.filter((item) => item.isPublic).length;
+  const formatPercent = (value) => (total ? `${((value / total) * 100).toFixed(1)}%` : '0%');
+
+  return [
+    ['Total strategies', [`${total}`, formatPercent(total)], ['Active', formatPercent(active)], ['Inactive', formatPercent(total - active)]],
+    ['Running strategies', [`${running}`, formatPercent(running)], ['Stopped', formatPercent(total - running)], ['Public', formatPercent(isPublic)]],
+  ];
+}, [recentStrategies]);
+
+const tradeRows = useMemo(() => {
+  if (!recentStrategies?.length) return [];
+  return recentStrategies.map((strategy, index) => ({
+    id: strategy.id || index,
+    name: strategy.name || `Strategy ${index + 1}`,
+    owner: strategy.user?.name || strategy.createdBy || 'Unknown',
+    status: strategy.isActive ? 'Active' : 'Inactive',
+    visibility: strategy.isPublic ? 'Public' : 'Private',
+    createdAt: strategy.createdAt
+      ? new Date(strategy.createdAt).toLocaleDateString()
+      : 'N/A',
+  }));
+}, [recentStrategies]);
 
 
   return (
@@ -197,29 +265,29 @@ const series = [
 
           {activeTab === 0 && (
             <Stack direction="row" spacing={2} alignItems="center">
-          
-
-              <FormControl size="small">
-                <Select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                >
-                  <MenuItem value="1W">1 Week</MenuItem>
-                  <MenuItem value="1M">1 Month</MenuItem>
-                  <MenuItem value="3M">3 Months</MenuItem>
-                  <MenuItem value="6M">6 Months</MenuItem>
-                  <MenuItem value="1Y">1 Year</MenuItem>
-                  <MenuItem value="5Y">5 Years</MenuItem>
-                  <MenuItem value="5Y">Inception</MenuItem>
-                </Select>
-              </FormControl>
+              {!backendChartData && (
+                <FormControl size="small">
+                  <Select
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value)}
+                  >
+                    <MenuItem value="1W">1 Week</MenuItem>
+                    <MenuItem value="1M">1 Month</MenuItem>
+                    <MenuItem value="3M">3 Months</MenuItem>
+                    <MenuItem value="6M">6 Months</MenuItem>
+                    <MenuItem value="1Y">1 Year</MenuItem>
+                    <MenuItem value="5Y">5 Years</MenuItem>
+                    <MenuItem value="Inception">Inception</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
             </Stack>
           )}
         </Stack>
       </CardContent>
 
       <Box sx={{ px: 3, pb: 3 }}>
-        {activeTab === 0 && (
+          {activeTab === 0 && (
       <Chart options={options} series={series} type="area" height={350} width="100%" />
 
         )}
@@ -230,21 +298,18 @@ const series = [
       <Table size="small" sx={{ minWidth: 500 }}>
         <TableBody>
           {[
-            ['Strategy Name', 'Momentum Surge A'],
-            ['Created By', 'John Doe'],
-            ['Created On', '12 March 2024'],
-            ['Last Updated', '5 June 2025'],
-            ['Type', 'Momentum-based'],
-            ['Risk Level', 'Moderate'],
-            ['Market Focus', 'Equities, Commodities'],
-            ['Timeframe', '15min – 1hr'],
-            ['Backtest Period', 'Jan 2020 – Dec 2023'],
-            ['Execution Style', 'Automated via API (limit/market orders)'],
+            ['Strategy Name', strategyDetails.name],
+            ['Created By', strategyDetails.createdBy],
+            ['Created On', strategyDetails.createdOn],
+            ['Last Updated', strategyDetails.lastUpdated],
+            ['Type', strategyDetails.type],
+            ['Risk Level', strategyDetails.riskLevel],
+            ['Market Focus', strategyDetails.marketFocus],
+            ['Timeframe', strategyDetails.timeframe],
+            ['Segment', strategyDetails.segment],
             [
               'Description',
-              `Momentum Surge A is designed to exploit rapid price movements during high-volume periods. 
-It uses real-time volatility indicators to enter trades and tight stop losses to minimize risk. 
-The system avoids trading in sideways or choppy markets, focusing only on clear breakouts.`,
+              strategyDetails.description,
             ],
           ].map(([label, value], idx) => (
             <TableRow key={idx}>
@@ -268,41 +333,29 @@ The system avoids trading in sideways or choppy markets, focusing only on clear 
 {activeTab === 2 && (
   <Box sx={{ overflowX: 'auto' }}>
     <Scrollbar sx={{ maxHeight: 380 }}>
-      <Table size="small" sx={{ minWidth: 600 }}>
+      <Table size="small" sx={{ minWidth: 400 }}>
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>All</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Long</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Short</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Primary</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Secondary</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Notes</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {[
-            ['Open P&L', ['-', '-0.43%'], ['-', '-'], ['-', '-']],
-            ['Net profit', ['-58,546.30 USD', '-5.85%'], ['+446,550.93 USD', '+44.66%'], ['-505,097.23 USD', '-50.51%']],
-            ['Gross profit', ['3,690,315.80 USD', '369.03%'], ['2,299,983.88 USD', '230.00%'], ['1,390,331.92 USD', '139.03%']],
-            ['Gross loss', ['3,748,862.10 USD', '374.89%'], ['1,853,432.95 USD', '185.34%'], ['1,895,429.15 USD', '189.54%']],
-            ['Commission paid', ['0 USD'], ['0 USD'], ['0 USD']],
-            ['Buy & hold return', ['+1,955,400,000.00 USD', '+195,540.00%'], ['-', '-'], ['-', '-']],
-            ['Max equity run-up', ['193,432.22 USD', '18.20%'], ['-', '-'], ['-', '-']],
-            ['Max equity drawdown', ['199,346.80 USD', '18.86%'], ['-', '-'], ['-', '-']],
-            ['Max contracts held', ['1,420,958'], ['1,420,958'], ['1,150,131']],
-          ].map(([metric, all, long, short], idx) => (
-            <TableRow key={idx}>
+          {(performanceMetrics.length ? performanceMetrics : [
+            ['Total strategies', ['-', '-'], ['-', '-'], ['-', '-']],
+          ]).map(([metric, primary, secondary, tertiary], idx) => (
+            <TableRow key={metric + idx}>
               <TableCell>{metric}</TableCell>
-              {[all, long, short].map((val, i) => (
+              {[primary, secondary, tertiary].map((val, i) => (
                 <TableCell key={i}>
                   <Stack spacing={0.5}>
                     {val.map((item, j) => (
                       <Typography
                         key={j}
                         variant="body2"
-                        color={
-                          item.includes('+') ? 'success.main'
-                          : item.includes('-') ? 'error.main'
-                          : 'text.primary'
-                        }
+                        color={item.includes('%') ? (item.includes('-') ? 'error.main' : 'success.main') : 'text.primary'}
                       >
                         {item}
                       </Typography>
@@ -324,51 +377,27 @@ The system avoids trading in sideways or choppy markets, focusing only on clear 
       <Table size="small" sx={{ minWidth: 600 }}>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ fontWeight: 600 }}>Metric</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>All</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Long</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Short</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Owner</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Visibility</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Created On</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {[
-            ['Total trades', ['2,054'], ['1,030'], ['1,024']],
-            ['Total open trades', ['1'], ['1'], ['0']],
-            ['Winning trades', ['758'], ['415'], ['343']],
-            ['Losing trades', ['1,100'], ['522'], ['578']],
-            ['Percent profitable', ['36.90%'], ['40.29%'], ['33.50%']],
-            ['Avg P&L', ['-28.50 USD', '-0.01%'], ['433.54 USD', '0.48%'], ['-493.26 USD', '-0.51%']],
-            ['Avg winning trade', ['4,868.49 USD', '5.09%'], ['5,542.13 USD', '5.80%'], ['4,053.45 USD', '4.23%']],
-            ['Avg losing trade', ['3,408.06 USD', '3.53%'], ['3,550.64 USD', '3.66%'], ['3,279.29 USD', '3.41%']],
-            ['Ratio avg win / avg loss', ['1.429'], ['1.561'], ['1.236']],
-            ['Largest winning trade', ['49,950.64 USD'], ['49,950.64 USD'], ['45,772.02 USD']],
-            ['Largest winning trade %', ['53.33%'], ['53.33%'], ['45.65%']],
-            ['Largest losing trade', ['23,939.10 USD'], ['22,313.97 USD'], ['23,939.10 USD']],
-            ['Largest losing trade %', ['24.39%'], ['22.63%'], ['24.39%']],
-            ['Avg # bars in trades', ['6'], ['7'], ['5']],
-            ['Avg # bars in winning trades', ['8'], ['9'], ['7']],
-          ].map(([metric, all, long, short], idx) => (
-            <TableRow key={idx}>
-              <TableCell>{metric}</TableCell>
-              {[all, long, short].map((val, i) => (
-                <TableCell key={i}>
-                  <Stack spacing={0.5}>
-                    {val.map((item, j) => (
-                      <Typography
-                        key={j}
-                        variant="body2"
-                        color={
-                          item.includes('+') ? 'success.main'
-                            : item.includes('-') ? 'error.main'
-                            : 'text.primary'
-                        }
-                      >
-                        {item}
-                      </Typography>
-                    ))}
-                  </Stack>
-                </TableCell>
-              ))}
+          {(tradeRows.length ? tradeRows : [
+            { id: 0, name: 'No strategies found', owner: '-', status: '-', visibility: '-', createdAt: '-' },
+          ]).map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>{row.name}</TableCell>
+              <TableCell>{row.owner}</TableCell>
+              <TableCell>
+                <Typography color={row.status === 'Active' ? 'success.main' : 'error.main'}>
+                  {row.status}
+                </Typography>
+              </TableCell>
+              <TableCell>{row.visibility}</TableCell>
+              <TableCell>{row.createdAt}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -384,3 +413,17 @@ The system avoids trading in sideways or choppy markets, focusing only on clear 
 };
 
 export default Followers;
+
+Followers.propTypes = {
+  segmentStats: PropTypes.arrayOf(
+    PropTypes.shape({
+      segment: PropTypes.string,
+      count: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      dataValues: PropTypes.shape({
+        count: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      }),
+    })
+  ),
+  recentStrategies: PropTypes.arrayOf(PropTypes.object),
+  selectedStrategy: PropTypes.object,
+};

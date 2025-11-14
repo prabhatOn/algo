@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -8,28 +8,32 @@ import {
   Chip,
   Avatar,
   useTheme,
+  CircularProgress,
 } from '@mui/material';
 import { Users, Zap, TrendingUp } from 'lucide-react';
+import adminUserService from '../../../services/adminUserService';
+import { adminStrategyService } from '../../../services/adminStrategyService';
+import adminApiKeyService from '../../../services/adminApiKeyService';
 
-const usageData = [
+const initialUsageData = [
   {
     title: 'User Accounts',
     icon: Users,
-    current: 847,
+    current: 0,
     limit: 1000,
-    percentage: 84.7,
-    trend: '+12%',
-    status: 'warning',
+    percentage: 0,
+    trend: '+0%',
+    status: 'good',
     gradientFrom: '#3B82F6',
     gradientTo: '#8B5CF6',
   },
   {
     title: 'API Integrations',
     icon: Zap,
-    current: 156,
+    current: 0,
     limit: 200,
-    percentage: 78,
-    trend: '+8%',
+    percentage: 0,
+    trend: '+0%',
     status: 'good',
     gradientFrom: '#10B981',
     gradientTo: '#14B8A6',
@@ -37,15 +41,17 @@ const usageData = [
   {
     title: 'Trading Strategies',
     icon: TrendingUp,
-    current: 234,
+    current: 0,
     limit: 300,
-    percentage: 78,
-    trend: '+15%',
+    percentage: 0,
+    trend: '+0%',
     status: 'good',
     gradientFrom: '#F97316',
     gradientTo: '#EF4444',
   },
 ];
+
+
 
 const getChipColor = (status) => {
   switch (status) {
@@ -62,7 +68,7 @@ const getChipColor = (status) => {
 
 const UsageCard = ({
   title,
-  icon: Icon,
+  icon: IconComponent,
   current,
   limit,
   percentage,
@@ -93,7 +99,7 @@ const UsageCard = ({
             height: 48,
           }}
         >
-          <Icon color="white" size={20} />
+          <IconComponent color="white" size={20} />
         </Avatar>
         <Box>
           <Typography variant="body2" color="text.secondary">
@@ -137,6 +143,79 @@ const UsageCard = ({
 };
 
 export default function StatsGrid() {
+  const [loading, setLoading] = useState(true);
+  const [usageData, setUsageData] = useState(initialUsageData);
+
+  useEffect(() => {
+    const fetchUsageData = async () => {
+      try {
+        const [userResult, strategyResult, apiKeyResult] = await Promise.all([
+          adminUserService.getUserStats(),
+          adminStrategyService.getStrategyStats(),
+          adminApiKeyService.getApiKeyStats(),
+        ]);
+
+        const newUsageData = [...initialUsageData];
+
+        if (userResult.success) {
+          const totalUsers = userResult.data.total || userResult.data.totalUsers || 0;
+          const userLimit = 1000;
+          const userPercentage = (totalUsers / userLimit) * 100;
+          newUsageData[0] = {
+            ...newUsageData[0],
+            current: totalUsers,
+            limit: userLimit,
+            percentage: Math.min(userPercentage, 100),
+            status: userPercentage > 85 ? 'warning' : userPercentage > 95 ? 'danger' : 'good',
+          };
+        }
+
+        if (apiKeyResult.success) {
+          const overview = apiKeyResult.data?.data?.overview || apiKeyResult.data?.overview || {};
+          const totalApiKeys = Number(overview.total) || 0;
+          const apiLimit = 200;
+          const apiPercentage = (totalApiKeys / apiLimit) * 100;
+          newUsageData[1] = {
+            ...newUsageData[1],
+            current: totalApiKeys,
+            limit: apiLimit,
+            percentage: Math.min(apiPercentage, 100),
+            status: apiPercentage > 85 ? 'warning' : apiPercentage > 95 ? 'danger' : 'good',
+          };
+        }
+
+        if (strategyResult.success) {
+          const totalStrategies = strategyResult.data.total || strategyResult.data?.data?.total || 0;
+          const strategyLimit = 300;
+          const strategyPercentage = (totalStrategies / strategyLimit) * 100;
+          newUsageData[2] = {
+            ...newUsageData[2],
+            current: totalStrategies,
+            limit: strategyLimit,
+            percentage: Math.min(strategyPercentage, 100),
+            status: strategyPercentage > 85 ? 'warning' : strategyPercentage > 95 ? 'danger' : 'good',
+          };
+        }
+
+        setUsageData(newUsageData);
+      } catch (error) {
+        console.error('Error fetching usage data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsageData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" p={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box mt={2}>
       <Grid container spacing={3}>

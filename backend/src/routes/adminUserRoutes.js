@@ -9,7 +9,8 @@ import {
   toggleUserStatus,
   resetUserPassword,
   getUserActivity,
-  getUserStats
+  getUserStats,
+  getRecentActivityLogs
 } from '../controllers/adminUserController.js';
 import { idParamValidation, paginationValidation } from '../middleware/validation.js';
 
@@ -17,13 +18,16 @@ const router = express.Router();
 
 // All routes require authentication and admin role
 router.use(authenticate);
-router.use(authorize('Admin'));
+router.use(authorize('admin'));
 
 // Get all users with pagination, search, and filters
 router.get('/', paginationValidation, getAllUsers);
 
 // Get user statistics
 router.get('/stats', getUserStats);
+
+// Recent activity logs across all users (must be before :id routes)
+router.get('/activity/recent', getRecentActivityLogs);
 
 // Get specific user by ID
 router.get('/:id', idParamValidation, getUserById);

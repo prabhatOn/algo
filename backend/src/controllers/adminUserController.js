@@ -17,7 +17,6 @@ export const getAllUsers = async (req, res) => {
       status,
       role,
       verified,
-      plan,
       sortBy = 'createdAt',
       sortOrder = 'DESC'
     } = req.query;
@@ -58,10 +57,9 @@ export const getAllUsers = async (req, res) => {
       include: [
         {
           model: Plan,
-          as: 'activePlan',
+          as: 'plans',
           required: false,
-          where: { status: 'Active' },
-          attributes: ['id', 'type', 'price', 'billingCycle', 'status']
+          attributes: ['id', 'name', 'type', 'price', 'isActive', 'startDate', 'endDate']
         },
         {
           model: Wallet,
@@ -73,29 +71,36 @@ export const getAllUsers = async (req, res) => {
     });
 
     // Format the response
-    const formattedUsers = users.map(user => ({
-      id: user.id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      phoneVerified: user.phoneVerified,
-      avatar: user.avatar,
-      joinedDate: user.createdAt,
-      plan: user.activePlan ? {
-        type: user.activePlan.type,
-        price: user.activePlan.price,
-        billingCycle: user.activePlan.billingCycle
-      } : { type: 'Free', price: 0, billingCycle: 'N/A' },
-      wallet: user.wallet ? {
-        balance: user.wallet.balance,
-        currency: user.wallet.currency
-      } : { balance: 0, currency: 'INR' },
-      subscription: user.activePlan ? 'Subscribed' : 'Not Subscribed'
-    }));
+    const formattedUsers = users.map(user => {
+      // Get the active plan if it exists
+      const activePlan = user.plans?.find(p => p.isActive === true) || null;
+      
+      return {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        avatar: user.avatar,
+        joinedDate: user.createdAt,
+        plan: activePlan ? {
+          name: activePlan.name,
+          type: activePlan.type,
+          price: activePlan.price,
+          startDate: activePlan.startDate,
+          endDate: activePlan.endDate
+        } : { name: 'Free', type: 'N/A', price: 0 },
+        wallet: user.wallet ? {
+          balance: user.wallet.balance,
+          currency: user.wallet.currency
+        } : { balance: 0, currency: 'INR' },
+        subscription: activePlan ? 'Subscribed' : 'Not Subscribed'
+      };
+    });
 
     res.json({
       success: true,
@@ -350,6 +355,31 @@ export const resetUserPassword = async (req, res) => {
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+};
+
+// Get recent platform activity logs (any user)
+export const getRecentActivityLogs = async (req, res) => {
+  try {
+    const { limit = 25 } = req.query;
+
+    const activities = await ActivityLog.findAll({
+      limit: parseInt(limit),
+      order: [['createdAt', 'DESC']],
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'name', 'email', 'role']
+      }]
+    });
+
+    res.json({
+      success: true,
+      data: activities
+    });
+  } catch (error) {
+    console.error('Get recent activity logs error:', error);
+    res.status(500).json({ error: 'Failed to fetch recent activity' });
   }
 };
 

@@ -57,9 +57,12 @@ class DashboardService {
       };
     } catch (error) {
       console.error('Get admin dashboard error:', error);
+      const errorMessage = error.response?.status === 403 
+        ? 'Access denied. Admin privileges required.' 
+        : error.response?.data?.error || error.response?.data?.message || 'Failed to fetch admin dashboard';
       return {
         success: false,
-        error: error.response?.data?.error || 'Failed to fetch admin dashboard',
+        error: errorMessage,
       };
     }
   }

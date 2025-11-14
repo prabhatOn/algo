@@ -48,7 +48,7 @@ import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, S
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import FilterListIcon from '@mui/icons-material/FilterList';
 import Breadcrumb from "../../../components/layout/full/shared/breadcrumb/Breadcrumb";
-import { useAuth } from '../../../app/AuthProvider';
+import { useAuth } from '../../../app/authContext';
 
 const segmentColors = {
   Forex: { backgroundColor: "#dbeafe", color: "#1d4ed8" },

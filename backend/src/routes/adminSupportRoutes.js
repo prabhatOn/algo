@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize('Admin'));
+router.use(authorize('admin'));
 
 router.get('/', getAllTickets);
 router.get('/stats', getTicketStats);

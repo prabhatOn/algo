@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { AuthContext } from './authContext';
 import { jwtDecode } from 'jwt-decode';
 import { authService } from '../features/auth/services/authService';
 
@@ -21,21 +22,8 @@ const clearTokens = () => {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 };
 
-/* ─── context skeleton ─────────────────────────────────────────────────── */
-const AuthContext = createContext({
-  token: null,
-  refreshToken: null,
-  role: null,
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  login: () => {},
-  register: () => {},
-  logout: () => {},
-});
-
 /* ─── provider component ───────────────────────────────────────────────── */
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [token, setToken] = useState(getStoredToken());
   const [refreshToken, setRefreshToken] = useState(getStoredRefreshToken());
   const [role, setRole] = useState(null);
@@ -67,7 +55,10 @@ export const AuthProvider = ({ children }) => {
   /* decode token whenever it changes */
   useEffect(() => {
   const decodeToken = async () => {
+      console.log('[AuthProvider] Decoding token:', { hasToken: !!token });
+      
       if (!token) {
+        console.log('[AuthProvider] No token, clearing auth state');
         setRole(null);
         setUser(null);
         setIsLoading(false);
@@ -76,36 +67,44 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const payload = jwtDecode(token);
+        console.log('[AuthProvider] Token decoded:', { role: payload.role, id: payload.id });
 
         // Check if token is expired
         const currentTime = Date.now() / 1000;
         if (payload.exp < currentTime) {
+          console.log('[AuthProvider] Token expired, refreshing...');
           // Token expired, try to refresh
           handleTokenRefresh();
           return;
         }
 
+        console.log('[AuthProvider] Setting role from token:', payload.role);
         setRole(payload.role);
 
         // Try to fetch full profile from backend for richer user data
         try {
+          console.log('[AuthProvider] Fetching user profile...');
           const profileResult = await authService.getProfile();
           if (profileResult.success && profileResult.user) {
+            console.log('[AuthProvider] Profile fetched successfully:', { role: profileResult.user.role });
             setUser(profileResult.user);
           } else {
+            console.log('[AuthProvider] Profile fetch failed, using token payload');
             // Fallback to token payload if backend profile isn't available
             setUser(payload);
           }
         } catch (err) {
+          console.log('[AuthProvider] Profile fetch error, using token payload:', err.message);
           // If profile fetch fails, still set basic token payload
           setUser(payload);
         }
       } catch (err) {
-        console.error('Invalid token:', err);
+        console.error('[AuthProvider] Invalid token:', err);
         clearTokens();
         setToken(null);
         setRefreshToken(null);
       } finally {
+        console.log('[AuthProvider] Auth loading complete');
         setIsLoading(false);
       }
     };
@@ -185,5 +184,5 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-/* ─── custom hook ──────────────────────────────────────────────────────── */
-export const useAuth = () => useContext(AuthContext);
+/* NOTE: `useAuth` hook and `AuthContext` moved to `src/app/authContext.jsx` to
+   keep this file component-only for Fast Refresh compatibility. */

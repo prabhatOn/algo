@@ -12,8 +12,13 @@ export const roleCheck = (allowedRoles = []) => {
       });
     }
 
-    // Check if user has required role
-    if (!allowedRoles.includes(req.user.role)) {
+    // Normalize role comparison to be case-insensitive to avoid
+    // mismatches like 'admin' vs 'Admin' coming from different sources.
+    const allowedNormalized = allowedRoles.map((r) => String(r).toLowerCase());
+    const userRole = String(req.user.role || '').toLowerCase();
+
+    // Check if user has required role (case-insensitive)
+    if (!allowedNormalized.includes(userRole)) {
       return res.status(403).json({ 
         success: false,
         error: 'Forbidden - Insufficient permissions',

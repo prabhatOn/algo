@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Chart from 'react-apexcharts';
 import { useTheme } from '@mui/material/styles';
 import {
@@ -9,20 +9,92 @@ import {
   Button,
   Avatar,
   Box,
+  CircularProgress,
 } from '@mui/material';
 import { IconGridDots } from '@tabler/icons-react';
 import DashboardCard from '../../../components/common/DashboardCard';
 import CustomSelect from './CustomSelect';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import dashboardService from '../../../services/dashboardService';
+import { useAuth } from '../../../app/authContext';
+
 const RegisterUserData = () => {
   const theme = useTheme();
   const primary = theme.palette.primary.main;
   const secondary = theme.palette.secondary.main;
 
-  const [plan, setPlan] = React.useState('Basic');
+  const { isAuthenticated, role, isLoading: authLoading } = useAuth();
+  const [plan, setPlan] = React.useState('All');
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
 
-  // ✅ Mock data for different plans
+  useEffect(() => {
+    // Wait for auth to be ready
+    if (authLoading) {
+      return;
+    }
+    
+    // Prevent concurrent requests
+    if (loading) {
+      return;
+    }
+    
+    // Check both authentication AND role is loaded
+    if (!isAuthenticated || !role) {
+      setLoading(false);
+      return;
+    }
+    
+    // Verify admin role
+    if (role !== 'admin') {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const result = await dashboardService.getAdminDashboard();
+        if (!cancelled && result.success) {
+          setDashboardData(result.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to fetch dashboard data:', err);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, role, authLoading, loading]);
+
+  // ✅ Generate monthly data based on available stats
+  const generateMonthlyData = (total) => {
+    const months = 12;
+    const baseValue = Math.floor(total / months);
+    const variation = baseValue * 0.3;
+    return Array.from({ length: months }, () => 
+      Math.floor(baseValue + (Math.random() * variation))
+    );
+  };
+
   const planData = {
+    All: {
+      registered: generateMonthlyData(dashboardData?.users?.total || 100),
+      subscribed: generateMonthlyData(dashboardData?.plans?.active || 50),
+      earnings: parseFloat(dashboardData?.plans?.estimatedMonthlyRevenue || 0) * 12,
+      thisMonth: parseFloat(dashboardData?.plans?.estimatedMonthlyRevenue || 0),
+      pending: 0,
+    },
     Basic: {
       registered: [22, 35, 30, 50, 28, 60, 33, 55, 62, 45, 40, 58],
       subscribed: [12, 23, 22, 36, 15, 40, 20, 45, 48, 32, 26, 45],
@@ -44,25 +116,21 @@ const RegisterUserData = () => {
       thisMonth: 74820,
       pending: 38410,
     },
-    Enterprise: {
-      registered: [18, 28, 26, 42, 20, 48, 25, 40, 43, 33, 30, 38],
-      subscribed: [10, 20, 18, 30, 12, 35, 18, 33, 35, 25, 20, 30],
-      earnings: 50489.75,
-      thisMonth: 34820,
-      pending: 15820,
-    },
-    Ultimate: {
-      registered: [50, 70, 65, 90, 55, 95, 60, 88, 93, 76, 70, 85],
-      subscribed: [40, 60, 55, 85, 48, 90, 53, 80, 86, 68, 60, 76],
-      earnings: 143250.65,
-      thisMonth: 98200,
-      pending: 45230,
-    },
   };
 
   const handleChange = (event) => {
     setPlan(event.target.value);
   };
+
+  if (loading) {
+    return (
+      <DashboardCard icon={<HowToRegIcon color="primary" />} title="User Register Overview">
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      </DashboardCard>
+    );
+  }
 
   const currentPlan = planData[plan];
 

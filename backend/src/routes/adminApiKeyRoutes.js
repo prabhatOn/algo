@@ -13,7 +13,7 @@ const router = express.Router();
 
 // All routes require admin authentication
 router.use(authenticate);
-router.use(authorize('Admin'));
+router.use(authorize('admin'));
 
 // Get all API keys with filters
 router.get('/', getAllApiKeys);

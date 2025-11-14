@@ -152,11 +152,16 @@ const ViewUserDialog = ({ open, onClose, user }) => {
           value={
             <Box>
               <Typography variant="body1">
-                {user.plan?.type || 'Free'} Plan
+                {user.plan?.name || 'Free'}
               </Typography>
               {user.plan?.price > 0 && (
                 <Typography variant="caption" color="text.secondary">
-                  ₹{user.plan.price}/{user.plan.billingCycle}
+                  ₹{Number(user.plan.price).toFixed(2)} · {user.plan.type}
+                </Typography>
+              )}
+              {user.plan?.startDate && user.plan?.endDate && (
+                <Typography variant="caption" color="text.secondary">
+                  {formatDate(user.plan.startDate)} - {formatDate(user.plan.endDate)}
                 </Typography>
               )}
             </Box>
@@ -176,7 +181,7 @@ const ViewUserDialog = ({ open, onClose, user }) => {
         <InfoRow
           icon={CreditCard}
           label="Wallet Balance"
-          value={`${user.wallet?.currency === 'USD' ? '$' : '₹'}${user.wallet?.balance?.toFixed(2) || '0.00'}`}
+          value={`${user.wallet?.currency === 'USD' ? '$' : '₹'}${Number(user.wallet?.balance ?? 0).toFixed(2)}`}
         />
 
         <Divider sx={{ my: 3 }} />

@@ -59,8 +59,8 @@ export const getAllTrades = async (req, res) => {
       order,
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName', 'email']
+        as: 'user',
+        attributes: ['id', 'name', 'username', 'email']
       }]
     });
 
@@ -92,8 +92,8 @@ export const getTradeById = async (req, res) => {
     const trade = await Trade.findByPk(id, {
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber']
+        as: 'user',
+        attributes: ['id', 'name', 'username', 'email', 'phone']
       }]
     });
 
@@ -251,8 +251,8 @@ export const getTradeStats = async (req, res) => {
       order: [['createdAt', 'DESC']],
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName']
+        as: 'user',
+        attributes: ['id', 'name', 'username']
       }]
     });
 

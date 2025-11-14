@@ -16,11 +16,15 @@ import {
   useTheme,
   useMediaQuery,
   TablePagination,
+  CircularProgress,
+  Stack,
 } from "@mui/material"
 import { Schedule, CheckCircle, Warning, Error } from "@mui/icons-material"
 import { styled } from "@mui/material/styles"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { formatDistanceToNow } from "date-fns"
 import Scrollbar from "../../../components/custom-scroll/Scrollbar"
+import adminUserService from "../../../services/adminUserService"
 
 const StyledCard = styled(Card)(({ theme }) => ({
   border: "none",
@@ -44,28 +48,45 @@ const MobileActivityCard = styled(Card)(({ theme }) => ({
   boxShadow: theme.shadows[1],
 }))
 
-const recentActivity = [
-  { id: 1, type: "User", action: "Created", name: "john.doe@example.com", time: "2 min ago", status: "success" },
-  { id: 2, type: "API", action: "Added", name: "Binance Integration", time: "5 min ago", status: "success" },
-  { id: 3, type: "Strategy", action: "Created", name: "RSI Momentum", time: "12 min ago", status: "success" },
-  { id: 4, type: "User", action: "Limit Reached", name: "Premium Plan", time: "1 hour ago", status: "warning" },
-  { id: 5, type: "API", action: "Failed", name: "Coinbase Pro", time: "2 hours ago", status: "error" },
-  { id: 6, type: "Strategy", action: "Updated", name: "MACD Signal", time: "3 hours ago", status: "success" },
-  { id: 7, type: "User", action: "Created", name: "new.user@example.com", time: "3 hours ago", status: "success" },
-  { id: 8, type: "API", action: "Removed", name: "Old API", time: "4 hours ago", status: "error" },
-  { id: 9, type: "Strategy", action: "Archived", name: "Bollinger Bands", time: "6 hours ago", status: "warning" },
-  { id: 10, type: "User", action: "Updated", name: "alice@example.com", time: "7 hours ago", status: "success" },
-  { id: 11, type: "Strategy", action: "Deleted", name: "Test Strategy", time: "10 hours ago", status: "error" },
-  { id: 12, type: "API", action: "Throttled", name: "Kraken API", time: "12 hours ago", status: "warning" },
-  { id: 13, type: "API", action: "Refreshed", name: "CoinMarketCap", time: "13 hours ago", status: "success" },
-  { id: 14, type: "Strategy", action: "Paused", name: "EMA Crossover", time: "14 hours ago", status: "warning" },
-]
-
 export default function ActivityTable() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
   const [page, setPage] = useState(0)
+  const [activities, setActivities] = useState([])
+  const [loading, setLoading] = useState(true)
   const rowsPerPage = 10
+
+  useEffect(() => {
+    const fetchActivity = async () => {
+      try {
+        const result = await adminUserService.getRecentActivity({ limit: 50 })
+        if (result.success) {
+          const normalized = (result.data || []).map((log) => ({
+            id: log.id,
+            type: log.entityType || log.metadata?.entityType || 'System',
+            action: log.action,
+            name:
+              log.description ||
+              log.metadata?.details ||
+              log.user?.email ||
+              log.user?.name ||
+              'Unknown',
+            time: log.createdAt
+              ? formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })
+              : '—',
+            status: (log.metadata?.status || 'info').toLowerCase(),
+          }))
+          setActivities(normalized)
+        }
+      } catch (error) {
+        console.error('Error fetching activity logs:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchActivity()
+  }, [])
 
   const handleChangePage = (_, newPage) => {
     setPage(newPage)
@@ -93,12 +114,40 @@ export default function ActivityTable() {
         return "success"
       case "Strategy":
         return "secondary"
+      case "Trade":
+        return "warning"
       default:
         return "default"
     }
   }
 
-  const paginatedActivities = recentActivity.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+  const paginatedActivities = activities.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+
+  if (loading) {
+    return (
+      <StyledCard>
+        <CardContent>
+          <Stack alignItems="center" py={4}>
+            <CircularProgress size={32} />
+          </Stack>
+        </CardContent>
+      </StyledCard>
+    )
+  }
+
+  if (!activities.length) {
+    return (
+      <StyledCard>
+        <CardContent>
+          <Stack alignItems="center" py={4}>
+            <Typography variant="body2" color="text.secondary">
+              No activity recorded yet.
+            </Typography>
+          </Stack>
+        </CardContent>
+      </StyledCard>
+    )
+  }
 
   if (isMobile) {
     return (
@@ -128,7 +177,7 @@ export default function ActivityTable() {
         <Box px={2} pb={2}>
           <TablePagination
             component="div"
-            count={recentActivity.length}
+            count={activities.length}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
@@ -183,7 +232,7 @@ export default function ActivityTable() {
       <Box px={2} pb={2}>
         <TablePagination
           component="div"
-          count={recentActivity.length}
+          count={activities.length}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}

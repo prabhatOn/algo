@@ -12,7 +12,7 @@ const router = express.Router();
 
 // All routes require authentication and admin authorization
 router.use(authenticate);
-router.use(authorize('Admin'));
+router.use(authorize('admin'));
 
 // Get trade statistics
 router.get('/stats', getTradeStats);

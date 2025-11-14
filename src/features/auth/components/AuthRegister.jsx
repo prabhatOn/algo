@@ -5,7 +5,7 @@ import AppRegistrationIcon from '@mui/icons-material/AppRegistration';
 import CustomTextField from '../../../components/forms/theme-elements/CustomTextField';
 import CustomFormLabel from '../../../components/forms/theme-elements/CustomFormLabel';
 import { Stack } from '@mui/system';
-import { useAuth } from '../../../app/AuthProvider';
+import { useAuth } from '../../../app/authContext';
 import { useToast } from '../../../hooks/useToast';
 import AuthSocialButtons from './AuthSocialButtons';
 

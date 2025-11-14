@@ -167,6 +167,25 @@ class AdminUserService {
   }
 
   /**
+   * Get recent platform activity logs
+   */
+  async getRecentActivity(params = {}) {
+    try {
+      const response = await apiClient.get('/admin/users/activity/recent', { params });
+      return {
+        success: true,
+        data: response.data.data || response.data
+      };
+    } catch (error) {
+      console.error('Get recent activity error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch recent activity'
+      };
+    }
+  }
+
+  /**
    * Get user statistics
    */
   async getUserStats() {

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import PropTypes from "prop-types";
 import {
  
@@ -22,9 +22,25 @@ const getSwitchColor = (status, theme) => {
   }
 };
 
-const StrategyOverview = ({ strategy, onToggleStatus }) => {
+const StrategyOverview = ({ strategy, onToggleStatus, disabled = false }) => {
   const theme = useTheme();
 
+  const computedFields = useMemo(() => {
+    const createdOn = strategy.createdOn || strategy.createdAt || strategy.updatedAt || null;
+    const createdDate = createdOn ? new Date(createdOn) : null;
+    const isActive = typeof strategy.status === 'string'
+      ? strategy.status.toLowerCase() === 'active'
+      : Boolean(strategy.isActive);
+
+    return {
+      author: strategy.createdBy || strategy.madeBy || strategy.user?.name || 'Unknown',
+      createdOnLabel: createdDate ? createdDate.toLocaleDateString() : 'N/A',
+      type: strategy.type || (strategy.isPublic ? 'Public' : 'Private'),
+      category: strategy.category || strategy.segment || strategy.symbol || 'N/A',
+      statusLabel: strategy.status || (isActive ? 'Active' : 'Inactive'),
+      isActive,
+    };
+  }, [strategy]);
 
   return (
     <DashboardCard sx={{ backgroundColor: 'primary.light'}} >
@@ -34,19 +50,20 @@ const StrategyOverview = ({ strategy, onToggleStatus }) => {
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Avatar src={iconInactive} sx={{ width: 32, height: 32 }} />
-            <Typography variant="h6" fontWeight={600}>{strategy.name}</Typography>
+            <Typography variant="h6" fontWeight={600}>{strategy.name || 'Untitled Strategy'}</Typography>
           </Box>
 
-          <Tooltip title={strategy.status === "Active" ? "Click to deactivate" : "Click to activate"}>
+          <Tooltip title={computedFields.isActive ? "Click to deactivate" : "Click to activate"}>
             <Switch
-              checked={strategy.status.toLowerCase() === "active"}
+              checked={computedFields.isActive}
               onChange={() => onToggleStatus(strategy.id)}
+              disabled={disabled}
               sx={{
                 "& .MuiSwitch-switchBase.Mui-checked": {
-                  color: getSwitchColor(strategy.status, theme),
+                  color: getSwitchColor(computedFields.statusLabel, theme),
                 },
                 "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
-                  backgroundColor: getSwitchColor(strategy.status, theme),
+                  backgroundColor: getSwitchColor(computedFields.statusLabel, theme),
                 },
               }}
             />
@@ -55,17 +72,17 @@ const StrategyOverview = ({ strategy, onToggleStatus }) => {
 
         {/* Info Chips */}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 ,mt:1}}>
-          <Chip label={`By: ${strategy.createdBy}`} size="small" color="primary" sx={{p:1}} />
-          <Chip label={`On: ${new Date(strategy.createdOn).toLocaleDateString()}`} size="small" color="info" sx={{p:1}} />
-          <Chip label={`Type: ${strategy.type}`} size="small" color="secondary" sx={{p:1}} />
-          <Chip label={`Category: ${strategy.category}`} size="small" color="default" sx={{p:1}} />
+          <Chip label={`By: ${computedFields.author}`} size="small" color="primary" sx={{p:1}} />
+          <Chip label={`On: ${computedFields.createdOnLabel}`} size="small" color="info" sx={{p:1}} />
+          <Chip label={`Type: ${computedFields.type}`} size="small" color="secondary" sx={{p:1}} />
+          <Chip label={`Category: ${computedFields.category}`} size="small" color="default" sx={{p:1}} />
         </Box>
 
         {/* Status Label */}
         <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           <Chip
-            label={strategy.status}
-            color={strategy.status.toLowerCase() === "active" ? "success" : "error"}
+            label={computedFields.statusLabel}
+            color={computedFields.isActive ? "success" : "error"}
             size="small"
             sx={{ fontWeight: 600 }}
           />
@@ -78,15 +95,19 @@ const StrategyOverview = ({ strategy, onToggleStatus }) => {
 
 StrategyOverview.propTypes = {
   strategy: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    createdBy: PropTypes.string.isRequired,
-    createdOn: PropTypes.string.isRequired,
-    type: PropTypes.string.isRequired,
-    category: PropTypes.string.isRequired,
-    status: PropTypes.oneOf(["Active", "Inactive"]).isRequired,
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    name: PropTypes.string,
+    createdBy: PropTypes.string,
+    createdOn: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    type: PropTypes.string,
+    category: PropTypes.string,
+    segment: PropTypes.string,
+    status: PropTypes.string,
+    isActive: PropTypes.bool,
   }).isRequired,
   onToggleStatus: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
 };
 
 export default StrategyOverview;

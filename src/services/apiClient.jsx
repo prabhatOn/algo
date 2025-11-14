@@ -21,6 +21,13 @@ apiClient.interceptors.request.use(
     const token = localStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[apiClient] Token added to request:', { 
+        url: config.url, 
+        hasToken: !!token,
+        tokenPreview: token.substring(0, 20) + '...'
+      });
+    } else {
+      console.warn('[apiClient] No token found in localStorage for request:', config.url);
     }
 
     // Add request ID for tracing

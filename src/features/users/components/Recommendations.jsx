@@ -14,7 +14,10 @@ import {
 } from "@mui/material"
 import { Warning, TrendingUp, FlashOn, ExpandMore, ExpandLess } from "@mui/icons-material"
 import { styled } from "@mui/material/styles"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import adminUserService from "../../../services/adminUserService"
+import { adminStrategyService } from "../../../services/adminStrategyService"
+import adminApiKeyService from "../../../services/adminApiKeyService"
 
 
 
@@ -50,38 +53,99 @@ const RecommendationBox = styled(Box)(({ theme, priority }) => {
   }
 })
 
-const suggestions = [
-  {
-    title: "Upgrade User Limit",
-    description: "You're at 84.7% capacity. Consider upgrading to prevent service disruption.",
-    priority: "high",
-    action: "Upgrade Plan",
-    icon: TrendingUp,
-    gradient: "linear-gradient(135deg,rgb(240, 149, 142),rgb(245, 200, 215))",
-  },
-  {
-    title: "API Rate Optimization",
-    description: "Some APIs are underutilized. Review and optimize your API allocation.",
-    priority: "medium",
-    action: "Review APIs",
-    icon: FlashOn,
-    gradient: "linear-gradient(135deg,rgb(235, 215, 186),rgb(223, 208, 193))",
-  },
-  {
-    title: "Strategy Performance",
-    description: "15 strategies haven't been used in 30 days. Consider archiving inactive ones.",
-    priority: "low",
-    action: "Clean Up",
-    icon: Warning,
-    gradient: "linear-gradient(135deg,rgb(161, 198, 228),rgb(175, 185, 241))",
-  },
-]
-
 export default function Recommendations() {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"))
   const [expanded, setExpanded] = useState(false)
   const [visibleItems, setVisibleItems] = useState(isMobile ? 2 : 3)
+  const [suggestions, setSuggestions] = useState([])
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const [userStats, strategyStats, apiStats] = await Promise.all([
+          adminUserService.getUserStats(),
+          adminStrategyService.getStrategyStats(),
+          adminApiKeyService.getApiKeyStats(),
+        ])
+
+        const nextSuggestions = []
+        if (userStats.success) {
+          const total = userStats.data.total || 0
+          const active = userStats.data.active || 0
+          const recent = userStats.data.recentSignups || 0
+          const usageRatio = total / 1000
+          if (usageRatio >= 0.8) {
+            nextSuggestions.push({
+              title: 'Upgrade User Capacity',
+              description: `You are using ${(usageRatio * 100).toFixed(1)}% of the 1,000 user allocation. Plan for additional seats soon to avoid throttling.`,
+              priority: usageRatio > 0.9 ? 'high' : 'medium',
+              action: 'Review Plans',
+              icon: TrendingUp,
+              gradient: 'linear-gradient(135deg,rgb(240, 149, 142),rgb(245, 200, 215))',
+            })
+          } else {
+            nextSuggestions.push({
+              title: 'Grow Active Users',
+              description: `${active} of ${total} users are active. Send a re-engagement campaign to convert the remaining ${(total - active).toString()} accounts.`,
+              priority: 'low',
+              action: 'Send Campaign',
+              icon: TrendingUp,
+              gradient: 'linear-gradient(135deg,rgb(161, 198, 228),rgb(175, 185, 241))',
+            })
+          }
+
+          if (recent < 5) {
+            nextSuggestions.push({
+              title: 'Boost New Sign-ups',
+              description: `Only ${recent} new users joined this week. Consider launching a referral push.`,
+              priority: 'medium',
+              action: 'Launch Referral',
+              icon: Warning,
+              gradient: 'linear-gradient(135deg,rgb(235, 215, 186),rgb(223, 208, 193))',
+            })
+          }
+        }
+
+        if (apiStats.success) {
+          const overview = apiStats.data?.data?.overview || apiStats.data?.overview || {}
+          const inactive = Number(overview.inactive || 0)
+          if (inactive > 0) {
+            nextSuggestions.push({
+              title: 'Review API Integrations',
+              description: `${inactive} API keys are inactive. Disable or repurpose them to reduce clutter and risk.`,
+              priority: inactive > 5 ? 'high' : 'medium',
+              action: 'Audit APIs',
+              icon: FlashOn,
+              gradient: 'linear-gradient(135deg,rgb(161, 198, 228),rgb(175, 185, 241))',
+            })
+          }
+        }
+
+        if (strategyStats.success) {
+          const totalStrategies = strategyStats.data.total || 0
+          const running = strategyStats.data.running || 0
+          if (totalStrategies > 0 && running / totalStrategies < 0.5) {
+            nextSuggestions.push({
+              title: 'Activate Strategies',
+              description: `Only ${running} of ${totalStrategies} strategies are running. Consider restarting paused performers.`,
+              priority: 'medium',
+              action: 'Review Strategies',
+              icon: Warning,
+              gradient: 'linear-gradient(135deg,rgb(235, 215, 186),rgb(223, 208, 193))',
+            })
+          }
+        }
+
+        setSuggestions(nextSuggestions)
+        setVisibleItems(Math.min(nextSuggestions.length, isMobile ? 2 : 3))
+      } catch (error) {
+        console.error('Error building recommendations:', error)
+      }
+    }
+
+    fetchInsights()
+  }, [isMobile])
 
   const getPriorityChipColor = (priority) => {
     switch (priority) {
@@ -206,6 +270,12 @@ export default function Recommendations() {
                 </Typography>
               </IconButton>
             </Box>
+          )}
+
+          {!suggestions.length && (
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              No recommendations at the moment.
+            </Typography>
           )}
         </Box>
       </CardContent>

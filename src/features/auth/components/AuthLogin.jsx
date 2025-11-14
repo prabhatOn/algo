@@ -14,7 +14,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import CustomCheckbox from '../../../components/forms/theme-elements/CustomCheckbox';
 import CustomTextField from '../../../components/forms/theme-elements/CustomTextField';
 import CustomFormLabel from '../../../components/forms/theme-elements/CustomFormLabel';
-import { useAuth } from '../../../app/AuthProvider';
+import { useAuth } from '../../../app/authContext';
 import { useToast } from '../../../hooks/useToast';
 
 import AuthSocialButtons from './AuthSocialButtons';

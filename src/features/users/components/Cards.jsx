@@ -67,8 +67,8 @@
 // };
 
 // export default TopCards;
-import React from 'react';
-import { Box, Card, Typography, Grid, Avatar, Tooltip } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Card, Typography, Grid, Avatar, Tooltip, CircularProgress } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   IconUser,
@@ -77,17 +77,57 @@ import {
   IconUserPlus,
   IconClock,
 } from '@tabler/icons-react';
+import adminUserService from '../../../services/adminUserService';
 
 const TopCards = () => {
   const theme = useTheme();
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    new: 0,
+    pending: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const result = await adminUserService.getUserStats();
+        if (result.success) {
+          setStats({
+            total: result.data.total || 0,
+            active: result.data.active || 0,
+            inactive: result.data.inactive || 0,
+            new: result.data.recentSignups || 0,
+            pending: 0, // Not tracked yet
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const cards = [
-    { icon: IconUser, title: 'Total Users', digits: '25', color: 'primary' },
-    { icon: IconUserCheck, title: 'Active Users', digits: '15', color: 'success' },
-    { icon: IconUserX, title: 'Inactive Users', digits: '10', color: 'error' },
-    { icon: IconUserPlus, title: 'New Users', digits: '5', color: 'info' },
-    { icon: IconClock, title: 'Pending', digits: '5', color: 'warning' },
+    { icon: IconUser, title: 'Total Users', digits: stats.total.toString(), color: 'primary' },
+    { icon: IconUserCheck, title: 'Active Users', digits: stats.active.toString(), color: 'success' },
+    { icon: IconUserX, title: 'Inactive Users', digits: stats.inactive.toString(), color: 'error' },
+    { icon: IconUserPlus, title: 'New Users', digits: stats.new.toString(), color: 'info' },
+    { icon: IconClock, title: 'Pending', digits: stats.pending.toString(), color: 'warning' },
   ];
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" p={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Grid container spacing={2}>

@@ -186,7 +186,8 @@ export const getApiKeyStats = async (req, res) => {
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN status = 'Inactive' THEN 1 ELSE 0 END) as inactive,
+  SUM(CASE WHEN status = 'Inactive' THEN 1 ELSE 0 END) as inactive,
+  SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN isVerified = 1 THEN 1 ELSE 0 END) as verified,
         SUM(CASE WHEN segment = 'Indian' THEN 1 ELSE 0 END) as indian,
         SUM(CASE WHEN segment = 'Forex' THEN 1 ELSE 0 END) as forex,

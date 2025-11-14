@@ -5,7 +5,7 @@ import { useContext } from 'react';
 import img1 from '../../../../../../assets/images/profile/user-1.jpg';
 import { IconPower } from '@tabler/icons-react';
 import { Link } from "react-router";
-import { useAuth } from '../../../../../../app/AuthProvider';
+import { useAuth } from '../../../../../../app/authContext';
 import { useToast } from '../../../../../../hooks/useToast';
 
 export const Profile = () => {

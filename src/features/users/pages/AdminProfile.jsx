@@ -4,9 +4,7 @@ import {
   Box,
   Typography,
   Avatar,
-  Paper,
   Button,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -16,6 +14,8 @@ import {
   Divider,
   Tooltip,
   Switch,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import {
   Phone,
@@ -38,15 +38,21 @@ import {
   Home,
   Hash,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import LabelValueBox from "../components/LabelValueBox";
 import SectionCard from "../components/SectionCard";
 import Breadcrumb from '../../../components/layout/full/shared/breadcrumb/Breadcrumb';
+import { getUserProfile, updateUserProfile, uploadAvatar } from "../services/userService";
+import { useToast } from "../../../hooks/useToast";
 
 const BCrumb = [
   { to: '/dashboard/profile', title: 'Account' },
   { title: 'Profile' },
 ];
+
+const formatBoolean = (value) => (value ? 'Yes' : 'No');
+const getDisplayValue = (value, fallback = '-') =>
+  value === null || value === undefined || value === '' ? fallback : value;
 
 // Mapping icons to each field
 const fieldIcons = {
@@ -81,8 +87,12 @@ const fieldIcons = {
   verified: <CheckCircle size={16} />,
 };
 
-const EditProfileModal = ({ open, onClose, onSave, data, section }) => {
+const EditProfileModal = ({ open, onClose, onSave, data, section, saving }) => {
   const [formData, setFormData] = useState({ ...data });
+
+  useEffect(() => {
+    setFormData({ ...data });
+  }, [data]);
 
   const handleChange = (key) => (e) => {
     setFormData({ ...formData, [key]: e.target.value });
@@ -90,21 +100,21 @@ const EditProfileModal = ({ open, onClose, onSave, data, section }) => {
 
   const handleSave = () => {
     onSave(section, formData);
-    onClose();
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Edit {section} Information</DialogTitle>
       <DialogContent dividers>
         {Object.keys(data).map((key, index) => (
           <Box key={key}>
             <TextField
               label={key.replace(/([A-Z])/g, " $1")}
-              value={formData[key]}
+              value={formData?.[key] ?? ''}
               onChange={handleChange(key)}
               margin="normal"
               fullWidth
+              disabled={saving}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -118,8 +128,10 @@ const EditProfileModal = ({ open, onClose, onSave, data, section }) => {
         ))}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave}>Save</Button>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} /> : null}>
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -131,63 +143,164 @@ const AdminProfile = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [sectionToEdit, setSectionToEdit] = useState("");
   const [sectionData, setSectionData] = useState({});
-  const [profile, setProfile] = useState({
-    name: "auser",
-    username: "user",
-    email: "info@binary-fusion.com",
-    phone: "(+62) 821 2554-5846",
-    status: "Active",
-    currency: "IND",
-    emailVerified: "Yes",
-    phoneVerified: "Yes",
-    password: "********",
-    referralCode: "REF1234",
-    referralLink: "https://example.com/ref/REF1234",
-    referredBy: "john_doe",
-    joinedBy: "06-06-25",
-    clientId: "C12345678",
-    clientType: "Individual",
-    organizationName: "Binary Fusion Ltd",
-    incorporationNumber: "INC7845123",
-    taxId: "TX998877",
-    gstNumber: "GST123456",
-    panNumber: "PAN1234567",
-    address1: "123 Baker Street",
-    address2: "Suite 5B",
-    city: "London",
-    state: "England",
-    country: "United Kingdom",
-    postalCode: "ERT 1254",
-    contactPhone: "+44 20 7946 0958",
-    contactEmail: "support@binary-fusion.com",
-    kycStatus: "Verified",
-    kycLevel: "Level 2 • Biometric",
-    documents: "Passport, Utility Bill",
-    verified: "Yes",
-  });
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const { showToast } = useToast();
 
-  const handleAvatarChange = (e) => {
+  const fetchProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await getUserProfile();
+      if (response.success) {
+        setProfile(response.data);
+        setAvatar(response.data.avatar || "");
+      } else {
+        setProfile(null);
+        setError(response.error || "Failed to load profile data.");
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+      setProfile(null);
+      setError('Failed to load profile data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setAvatar(reader.result);
-      reader.readAsDataURL(file);
+    if (!file) return;
+    setError(null);
+    setAvatarUploading(true);
+    const previousAvatar = avatar;
+    const previewUrl = URL.createObjectURL(file);
+    setAvatar(previewUrl);
+    try {
+      const response = await uploadAvatar(file);
+      if (response.success) {
+        showToast(response.message || 'Avatar updated successfully', 'success');
+        await fetchProfile();
+      } else {
+        const message = response.error || 'Failed to upload avatar';
+        setError(message);
+        showToast(message, 'error');
+        setAvatar(previousAvatar);
+      }
+    } catch (err) {
+      console.error('Error uploading avatar:', err);
+      const message = err.message || 'Failed to upload avatar';
+      setError(message);
+      showToast(message, 'error');
+      setAvatar(previousAvatar);
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      URL.revokeObjectURL(previewUrl);
     }
   };
 
   const handleEditClick = (section, data) => {
+    if (!profile) return;
+    setError(null);
     setSectionToEdit(section);
     setSectionData(data);
     setEditOpen(true);
   };
 
-  const handleSaveEdit = (section, updatedData) => {
-    setProfile((prev) => ({ ...prev, ...updatedData }));
+  const handleSaveEdit = async (section, updatedData) => {
+    try {
+      setSaving(true);
+      setError(null);
+      // eslint-disable-next-line no-unused-vars
+      const { password, ...payload } = updatedData;
+      const response = await updateUserProfile(payload);
+      if (response.success) {
+        setProfile((prev) => ({ ...prev, ...payload }));
+        setEditOpen(false);
+        showToast(response.message || 'Profile updated successfully', 'success');
+      } else {
+        const message = response.error || response.message || 'Failed to update profile';
+        setError(message);
+        showToast(message, 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      const message = err.message || 'Failed to update profile. Please try again.';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleStatusToggle = async (newStatus) => {
+    try {
+      setStatusUpdating(true);
+      setError(null);
+      const response = await updateUserProfile({ status: newStatus });
+      if (response.success) {
+        setProfile((prev) => ({ ...prev, status: newStatus }));
+        showToast('Account status updated', 'success');
+      } else {
+        const message = response.error || response.message || 'Failed to update account status';
+        setError(message);
+        showToast(message, 'error');
+      }
+    } catch (err) {
+      console.error('Failed to update status:', err);
+      const message = err.message || 'Failed to update account status';
+      setError(message);
+      showToast(message, 'error');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <>
+        <Breadcrumb title="Account" items={BCrumb} />
+        <Box p={3}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+          <Button variant="contained" onClick={fetchProfile}>
+            Retry
+          </Button>
+        </Box>
+      </>
+    );
+  }
 
   return (
     <>
       <Breadcrumb title="Account" items={BCrumb} />
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Box>
         <SectionCard
           title="Profile Details"
@@ -233,20 +346,17 @@ const AdminProfile = () => {
             <Tooltip title="Toggle Active/Inactive">
               <Switch
                 checked={profile.status === 'Active'}
-                onChange={(e) =>
-                  setProfile((prev) => ({
-                    ...prev,
-                    status: e.target.checked ? 'Active' : 'Inactive',
-                  }))
-                }
+                onChange={(e) => handleStatusToggle(e.target.checked ? 'Active' : 'Inactive')}
                 color="success"
+                disabled={statusUpdating}
               />
             </Tooltip>
 
             <Button
               variant="contained"
               size="small"
-              onClick={() => fileInputRef.current.click()}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
               sx={{
                 fontWeight: 600,
                 height: 32,
@@ -255,7 +365,7 @@ const AdminProfile = () => {
                 px: 2,
               }}
             >
-              Upload
+              {avatarUploading ? 'Uploading...' : 'Upload'}
             </Button>
           </Box>
 
@@ -265,6 +375,7 @@ const AdminProfile = () => {
             accept="image/*"
             hidden
             onChange={handleAvatarChange}
+            disabled={avatarUploading}
           />
         </SectionCard>
 
@@ -277,17 +388,16 @@ const AdminProfile = () => {
             phone: profile.phone,
             emailVerified: profile.emailVerified,
             phoneVerified: profile.phoneVerified,
-            password: profile.password,
             status: profile.status,
             currency: profile.currency,
           })}
         >
-          <LabelValueBox label="Mobile Phone" value={profile.phone} icon={<Phone size={16} />} verified />
-          <LabelValueBox label="Email Verified" value={profile.emailVerified} verified />
-          <LabelValueBox label="Phone Verified" value={profile.phoneVerified} verified />
-          <LabelValueBox label="Password" value={profile.password} />
-          <LabelValueBox label="Account Status" value={profile.status} verified />
-          <LabelValueBox label="Currency" value={profile.currency} />
+          <LabelValueBox label="Mobile Phone" value={getDisplayValue(profile.phone)} icon={<Phone size={16} />} />
+          <LabelValueBox label="Email Verified" value={formatBoolean(profile.emailVerified)} verified={profile.emailVerified} />
+          <LabelValueBox label="Phone Verified" value={formatBoolean(profile.phoneVerified)} verified={profile.phoneVerified} />
+          <LabelValueBox label="Password" value="••••••••" />
+          <LabelValueBox label="Account Status" value={profile.status || 'Inactive'} verified={profile.status === 'Active'} />
+          <LabelValueBox label="Currency" value={getDisplayValue(profile.currency)} />
         </SectionCard>
 
         <SectionCard
@@ -302,12 +412,12 @@ const AdminProfile = () => {
             clientType: profile.clientType,
           })}
         >
-          <LabelValueBox label="Referral Code" value={profile.referralCode} />
-          <LabelValueBox label="Referral Link" value={profile.referralLink} showCopy />
-          <LabelValueBox label="Referred By" value={profile.referredBy} />
-          <LabelValueBox label="Joined By" value={profile.joinedBy} />
-          <LabelValueBox label="Client ID" value={profile.clientId} showCopy />
-          <LabelValueBox label="Client Type" value={profile.clientType} />
+          <LabelValueBox label="Referral Code" value={getDisplayValue(profile.referralCode)} />
+          <LabelValueBox label="Referral Link" value={getDisplayValue(profile.referralLink)} showCopy />
+          <LabelValueBox label="Referred By" value={getDisplayValue(profile.referredBy)} />
+          <LabelValueBox label="Joined By" value={getDisplayValue(profile.joinedBy)} />
+          <LabelValueBox label="Client ID" value={getDisplayValue(profile.clientId)} showCopy />
+          <LabelValueBox label="Client Type" value={getDisplayValue(profile.clientType)} />
         </SectionCard>
 
         <SectionCard
@@ -321,11 +431,11 @@ const AdminProfile = () => {
             panNumber: profile.panNumber,
           })}
         >
-          <LabelValueBox label="Organization Name" value={profile.organizationName} />
-          <LabelValueBox label="Incorporation Number" value={profile.incorporationNumber} />
-          <LabelValueBox label="Tax ID" value={profile.taxId} />
-          <LabelValueBox label="GST Number" value={profile.gstNumber} />
-          <LabelValueBox label="PAN Number" value={profile.panNumber} showCopy />
+          <LabelValueBox label="Organization Name" value={getDisplayValue(profile.organizationName)} />
+          <LabelValueBox label="Incorporation Number" value={getDisplayValue(profile.incorporationNumber)} />
+          <LabelValueBox label="Tax ID" value={getDisplayValue(profile.taxId)} />
+          <LabelValueBox label="GST Number" value={getDisplayValue(profile.gstNumber)} />
+          <LabelValueBox label="PAN Number" value={getDisplayValue(profile.panNumber)} showCopy />
         </SectionCard>
 
         <SectionCard
@@ -342,14 +452,14 @@ const AdminProfile = () => {
             contactEmail: profile.contactEmail,
           })}
         >
-          <LabelValueBox label="Address Line 1" value={profile.address1} />
-          <LabelValueBox label="Address Line 2" value={profile.address2} />
-          <LabelValueBox label="City" value={profile.city} />
-          <LabelValueBox label="State" value={profile.state} />
-          <LabelValueBox label="Country" value={profile.country} />
-          <LabelValueBox label="Postal Code" value={profile.postalCode} />
-          <LabelValueBox label="Contact Phone" value={profile.contactPhone} icon={<Phone size={16} />} />
-          <LabelValueBox label="Contact Email" value={profile.contactEmail} icon={<Mail size={16} />} />
+          <LabelValueBox label="Address Line 1" value={getDisplayValue(profile.address1)} />
+          <LabelValueBox label="Address Line 2" value={getDisplayValue(profile.address2)} />
+          <LabelValueBox label="City" value={getDisplayValue(profile.city)} />
+          <LabelValueBox label="State" value={getDisplayValue(profile.state)} />
+          <LabelValueBox label="Country" value={getDisplayValue(profile.country)} />
+          <LabelValueBox label="Postal Code" value={getDisplayValue(profile.postalCode)} />
+          <LabelValueBox label="Contact Phone" value={getDisplayValue(profile.contactPhone)} icon={<Phone size={16} />} />
+          <LabelValueBox label="Contact Email" value={getDisplayValue(profile.contactEmail)} icon={<Mail size={16} />} />
         </SectionCard>
 
         <SectionCard
@@ -362,10 +472,10 @@ const AdminProfile = () => {
             verified: profile.verified,
           })}
         >
-          <LabelValueBox label="KYC Status" value={profile.kycStatus} verified />
-          <LabelValueBox label="KYC Level" value={profile.kycLevel} />
-          <LabelValueBox label="Documents" value={profile.documents} />
-          <LabelValueBox label="Verified" value={profile.verified} verified />
+          <LabelValueBox label="KYC Status" value={getDisplayValue(profile.kycStatus)} verified={profile.kycStatus === 'Verified'} />
+          <LabelValueBox label="KYC Level" value={getDisplayValue(profile.kycLevel)} />
+          <LabelValueBox label="Documents" value={getDisplayValue(profile.documents)} />
+          <LabelValueBox label="Verified" value={formatBoolean(profile.verified)} verified={profile.verified} />
         </SectionCard>
 
         <EditProfileModal
@@ -374,6 +484,7 @@ const AdminProfile = () => {
           onSave={handleSaveEdit}
           data={sectionData}
           section={sectionToEdit}
+          saving={saving}
         />
       </Box>
     </>

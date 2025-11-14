@@ -1,4 +1,5 @@
 import * as React from 'react';
+import PropTypes from 'prop-types';
 import {
   Box,
   Tabs,
@@ -40,12 +41,12 @@ const headCellsOpenOrders = [
   { id: 'currentPrice', label: 'Current Price' },
 ];
 
-const positionRows = [
+const defaultPositionRows = [
   { id: 1, sno: 1, symbol: 'AAPL', quantity: 50, price: 150, type: 'Buy', pnl: '+500', currentPrice: 160 },
   { id: 2, sno: 2, symbol: 'GOOGL', quantity: 20, price: 2800, type: 'Sell', pnl: '-200', currentPrice: 2780 },
 ];
 
-const openOrdersRows = [
+const defaultOpenOrdersRows = [
   { id: 1, sno: 1, symbol: 'TSLA', quantity: 10, price: 700, type: 'Buy', currentPrice: 710 },
   { id: 2, sno: 2, symbol: 'MSFT', quantity: 15, price: 300, type: 'Sell', currentPrice: 295 },
 ];
@@ -112,13 +113,16 @@ const EnhancedTableToolbar = ({ title, searchText, onSearchChange }) => (
   </Toolbar>
 );
 
-export default function EnhancedTableTabs() {
+export default function EnhancedTableTabs({ positions = [], openOrders = [] }) {
   const [tab, setTab] = React.useState(0);
   const [order, setOrder] = React.useState('asc');
   const [orderBy, setOrderBy] = React.useState('symbol');
   const [searchText, setSearchText] = React.useState('');
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
+
+  const positionRows = positions.length ? positions : defaultPositionRows;
+  const openOrdersRows = openOrders.length ? openOrders : defaultOpenOrdersRows;
 
   const handleChangeTab = (event, newValue) => {
     setTab(newValue);
@@ -248,3 +252,8 @@ export default function EnhancedTableTabs() {
     </Paper>
   );
 }
+
+EnhancedTableTabs.propTypes = {
+  positions: PropTypes.arrayOf(PropTypes.object),
+  openOrders: PropTypes.arrayOf(PropTypes.object),
+};

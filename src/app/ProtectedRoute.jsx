@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from './AuthProvider';
+import { useAuth } from './authContext';
 import { Box, CircularProgress } from '@mui/material';
 
 const ProtectedRoute = ({ children, requiredRole }) => {

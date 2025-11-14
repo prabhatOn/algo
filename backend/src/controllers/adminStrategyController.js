@@ -59,8 +59,8 @@ export const getAllStrategies = async (req, res) => {
       order,
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName', 'email']
+        as: 'user',
+        attributes: ['id', 'name', 'email', 'username']
       }]
     });
 
@@ -92,8 +92,8 @@ export const getStrategyById = async (req, res) => {
     const strategy = await Strategy.findByPk(id, {
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName', 'email', 'phoneNumber']
+        as: 'user',
+        attributes: ['id', 'name', 'email', 'username', 'phone']
       }]
     });
 
@@ -274,8 +274,8 @@ export const getStrategyStats = async (req, res) => {
       order: [['createdAt', 'DESC']],
       include: [{
         model: User,
-        as: 'User',
-        attributes: ['id', 'firstName', 'lastName']
+        as: 'user',
+        attributes: ['id', 'name', 'email']
       }]
     });
 
